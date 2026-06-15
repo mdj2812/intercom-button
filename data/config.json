@@ -1,0 +1,9 @@
+{
+    "wifi_ssid": "your_wifi_ssid",
+    "wifi_password": "your_wifi_password",
+    "server_host": "192.168.99.10",
+    "server_port": 8764,
+    "room": "study",
+    "sample_rate": 16000,
+    "max_record_secs": 60
+}

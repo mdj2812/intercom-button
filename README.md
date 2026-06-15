@@ -6,7 +6,7 @@ Push-to-talk desktop button for the [home-intercom](https://gitea.home.mdj2812.t
 
 | Component | Notes |
 |-----------|-------|
-| **MCU** | ESP32-S3-DevKitC (WROOM-1 N16R8) |
+| **MCU** | ESP32-S3-DevKitC (WROOM-1 N8) |
 | **Microphone** | MAX9814 electret mic module with AGC (¥5-6) |
 | **Button** | Any momentary push button (¥2) |
 | **BOM total** | ~¥8 (MCU already owned) |
@@ -24,16 +24,24 @@ MAX9814 gain: solder GAIN pad to GND for 50dB (recommended for desktop use).
 
 ### Per-device config
 
-Edit `src/config.h` before flashing:
+Configuration is stored in LittleFS (`data/config.json`), **not** in the source code.
+The same firmware binary works for all rooms — just upload a different config file.
 
-```c
-#define WIFI_SSID     "your_wifi"
-#define WIFI_PASSWORD "your_password"
-#define SERVER_HOST   "192.168.99.x"   // intercom server IP
-#define ROOM_TARGET   "书房"           // target room name
+```json
+{
+    "wifi_ssid": "your_wifi",
+    "wifi_password": "your_password",
+    "server_host": "192.168.99.10",
+    "server_port": 8764,
+    "room": "study",
+    "sample_rate": 16000,
+    "max_record_secs": 60
+}
 ```
 
-**Multi-button setup**: flash one ESP32-S3 per room, each with a different `ROOM_TARGET`.
+Room keys (from `rooms.json`): `study`, `living`, `cinema`, `bedroom`, or `all` for broadcast.
+
+**Multi-button setup**: flash firmware once, then for each device edit `data/config.json` (change `room`) and run `pio run -t uploadfs`.
 
 ## Quick Start
 
@@ -50,9 +58,15 @@ Edit `src/config.h` before flashing:
 Then inside the container:
 
 ```bash
-pio run              # compile
-pio run -t upload    # compile + flash (ESP32-S3 must be connected via USB)
-pio device monitor   # serial monitor (115200 baud)
+# First time: flash firmware + configuration
+pio run -t upload        # flash firmware
+# Edit data/config.json with your WiFi & room
+pio run -t uploadfs      # flash LittleFS config
+
+# Subsequent: just recompile
+pio run
+pio run -t upload
+pio device monitor
 ```
 
 ### Bare metal (no Docker)
@@ -151,8 +165,11 @@ esp32-intercom-button/
 │   ├── Dockerfile           # Self-contained dev image (3GB)
 │   ├── .docker-image        # Full registry path (source of truth)
 │   └── dev.sh               # One-command dev container
+├── data/
+│   └── config.json          # Per-device runtime config (LittleFS)
 └── src/
-    ├── config.h             # WiFi, server IP, room name
+    ├── config.h             # Pin definitions (compile-time)
+    ├── config_manager.h/cpp # JSON config loader (LittleFS)
     ├── main.cpp             # State machine: IDLE→RECORD→UPLOAD
     ├── wifi_manager.h/cpp   # Non-blocking WiFi + auto-reconnect
     ├── audio_recorder.h/cpp # 16kHz timer ISR → PSRAM → WAV
