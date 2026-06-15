@@ -1,8 +1,12 @@
 # Build the dev image:
-#   docker build -t esp32-pio-builder:v1.0.0 -f docker/Dockerfile .
+#   docker build --network host -t esp32-pio-builder:v1.0.0 -f docker/Dockerfile .
 #
 # Or use dev.sh which auto-builds and launches.
 FROM ubuntu:22.04
+
+# ── Use TUNA mirrors (faster in China) ─────────────
+RUN sed -i 's|http://archive.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
 
 # ── System dependencies ─────────────────────────────
 # python3-dev + build-essential for PlatformIO native extensions
@@ -14,8 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ── PlatformIO Core ─────────────────────────────────
-# Install via pip (faster than installer script)
-RUN pip3 install --no-cache-dir platformio
+# Use Tsinghua PyPI mirror for faster install
+RUN pip3 install --no-cache-dir \
+    -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple \
+    platformio
 
 # ── Pre-install ESP32-S3 toolchain + framework ──────
 # This downloads ~500MB of toolchains (xtensa-esp32s3, riscv32-esp),
@@ -33,7 +39,6 @@ USER dev
 WORKDIR /workspace
 
 # ── PlatformIO cache in home directory ──────────────
-# Already populated by the pio platform install above
 ENV PLATFORMIO_CORE_DIR=/home/dev/.platformio
 
 CMD ["/bin/bash"]
