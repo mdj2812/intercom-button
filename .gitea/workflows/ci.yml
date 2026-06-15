@@ -22,6 +22,8 @@ jobs:
   # ── Firmware Build ────────────────────────────────
   build:
     runs-on: check
+    container:
+      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
     steps:
       - uses: actions/checkout@v4
       - name: Build firmware
@@ -32,6 +34,8 @@ jobs:
   # ── Static Analysis ────────────────────────────────
   check:
     runs-on: check
+    container:
+      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
     steps:
       - uses: actions/checkout@v4
       - name: PlatformIO check (cppcheck + clang-tidy)
@@ -41,6 +45,8 @@ jobs:
   # ── Unit Tests (native, no hardware needed) ────────
   test:
     runs-on: check
+    container:
+      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
     steps:
       - uses: actions/checkout@v4
       - name: Run unit tests
