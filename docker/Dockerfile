@@ -20,6 +20,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cppcheck \
     && rm -rf /var/lib/apt/lists/*
 
+# ── Node.js 20.x (required by Gitea Actions runner) ─
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
 # ── PlatformIO Core ─────────────────────────────────
 RUN pip3 install --no-cache-dir \
     -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple \
