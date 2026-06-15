@@ -1,0 +1,4 @@
+.pio/
+docker/
+*.bin
+*.elf
