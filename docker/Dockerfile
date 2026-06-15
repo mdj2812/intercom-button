@@ -33,6 +33,9 @@ RUN pip3 install --no-cache-dir \
 # ── Pre-install ESP32 platform metadata ─────────────
 RUN pio platform install "espressif32"
 
+# ── Pre-install native platform (for unit tests) ────
+RUN pio platform install "native"
+
 # ── Copy toolchains + framework from host ───────────
 # These total ~1.8GB. Host must have them pre-downloaded
 # (run `pio run` on the host first).
@@ -40,6 +43,8 @@ COPY --from=pio-cache packages/toolchain-xtensa-esp32s3   /root/.platformio/pack
 COPY --from=pio-cache packages/toolchain-riscv32-esp      /root/.platformio/packages/toolchain-riscv32-esp
 COPY --from=pio-cache packages/framework-arduinoespressif32 /root/.platformio/packages/framework-arduinoespressif32
 COPY --from=pio-cache packages/tool-esptoolpy              /root/.platformio/packages/tool-esptoolpy
+COPY --from=pio-cache packages/tool-openocd-esp32           /root/.platformio/packages/tool-openocd-esp32
+COPY --from=pio-cache packages/tool-cppcheck               /root/.platformio/packages/tool-cppcheck
 COPY --from=pio-cache packages/tool-scons                  /root/.platformio/packages/tool-scons
 
 # ── Verify toolchains ────────────────────────────────
