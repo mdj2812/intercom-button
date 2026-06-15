@@ -22,32 +22,36 @@ jobs:
   # ── Firmware Build ────────────────────────────────
   build:
     runs-on: check
-    container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
+    env:
+      IMAGE: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
     steps:
       - uses: actions/checkout@v4
       - name: Build firmware
-        run: pio run
+        run: |
+          docker run --rm -v $(pwd):/workspace -w /workspace ${IMAGE} pio run
       - name: Show binary size
-        run: pio run -t size
+        run: |
+          docker run --rm -v $(pwd):/workspace -w /workspace ${IMAGE} pio run -t size
 
   # ── Static Analysis ────────────────────────────────
   check:
     runs-on: check
-    container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
+    env:
+      IMAGE: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
     steps:
       - uses: actions/checkout@v4
       - name: PlatformIO check (cppcheck + clang-tidy)
-        run: pio check --fail-on-defect=high --skip-packages 2>&1 || true
-        # `|| true` until we fix all existing warnings
+        run: |
+          docker run --rm -v $(pwd):/workspace -w /workspace ${IMAGE} \
+            pio check --fail-on-defect=high --skip-packages 2>&1 || true
 
   # ── Unit Tests (native, no hardware needed) ────────
   test:
     runs-on: check
-    container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
+    env:
+      IMAGE: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
     steps:
       - uses: actions/checkout@v4
       - name: Run unit tests
-        run: pio test -e native -v
+        run: |
+          docker run --rm -v $(pwd):/workspace -w /workspace ${IMAGE} pio test -e native -v
