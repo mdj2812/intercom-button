@@ -1,0 +1,220 @@
+# ESP32-S3 Desktop Intercom Button
+
+Push-to-talk desktop button for the [home-intercom](https://gitea.home.mdj2812.top/home_lab/home-intercom) system. Press and hold to record, release to broadcast to a target room via Xiaomi smart speakers.
+
+## Hardware
+
+| Component | Notes |
+|-----------|-------|
+| **MCU** | ESP32-S3-DevKitC (WROOM-1 N16R8) |
+| **Microphone** | MAX9814 electret mic module with AGC (¥5-6) |
+| **Button** | Any momentary push button (¥2) |
+| **BOM total** | ~¥8 (MCU already owned) |
+
+### Wiring
+
+| ESP32-S3 | MAX9814 | Button |
+|----------|---------|--------|
+| GPIO1 (ADC1_CH0) | OUT | — |
+| 3.3V | VCC | — |
+| GND | GND | one leg |
+| GPIO4 | — | other leg → GND |
+
+MAX9814 gain: solder GAIN pad to GND for 50dB (recommended for desktop use).
+
+### Per-device config
+
+Edit `src/config.h` before flashing:
+
+```c
+#define WIFI_SSID     "your_wifi"
+#define WIFI_PASSWORD "your_password"
+#define SERVER_HOST   "192.168.99.x"   // intercom server IP
+#define ROOM_TARGET   "书房"           // target room name
+```
+
+**Multi-button setup**: flash one ESP32-S3 per room, each with a different `ROOM_TARGET`.
+
+## Quick Start
+
+### Docker (recommended)
+
+```bash
+# Pull image from local registry + enter dev shell
+./docker/dev.sh
+
+# Or build + push a new version
+./docker/dev.sh -b -p
+```
+
+Then inside the container:
+
+```bash
+pio run              # compile
+pio run -t upload    # compile + flash (ESP32-S3 must be connected via USB)
+pio device monitor   # serial monitor (115200 baud)
+```
+
+### Bare metal (no Docker)
+
+Requires [PlatformIO Core](https://platformio.org/install/cli):
+
+```bash
+pip install platformio
+pio run
+pio run -t upload
+pio device monitor
+```
+
+## Commands
+
+| Command | What it does |
+|---------|-------------|
+| `pio run` | Compile firmware |
+| `pio run -t upload` | Compile + flash via USB |
+| `pio run -t clean` | Clean build artifacts |
+| `pio device monitor` | Open serial monitor (Ctrl+C to exit) |
+| `pio device monitor -b 115200` | Serial monitor with explicit baud rate |
+| `pio device list` | List connected serial devices |
+| `pio check` | Static analysis / lint |
+| `pio run -v` | Verbose build (see exact compiler flags) |
+
+### Flash via USB (first time)
+
+1. Connect ESP32-S3 via USB-C
+2. Check device: `ls /dev/ttyUSB*` or `ls /dev/ttyACM*`
+3. `pio run -t upload`
+4. PlatformIO auto-detects the port and flashes
+
+If auto-detect fails, specify the port:
+
+```bash
+pio run -t upload --upload-port /dev/ttyUSB0
+```
+
+### Docker-specific
+
+```bash
+# Interactive dev shell
+./docker/dev.sh
+
+# Run a single command
+./docker/dev.sh pio run
+./docker/dev.sh pio run -t upload
+
+# Rebuild Docker image locally
+./docker/dev.sh -b
+
+# Build + push to local registry
+./docker/dev.sh -b -p
+```
+
+## Architecture
+
+```
+┌──────────────┐   16kHz ADC     ┌───────────────┐   WAV POST   ┌──────────────┐
+│  MAX9814 Mic │ ──────────────→ │  ESP32-S3     │ ───────────→ │ Flask Server │
+│  (analog)    │   GPIO1 (ADC)   │  PSRAM buffer  │  /convert    │  :8764       │
+└──────────────┘                 │  WiFi STA      │              └──────┬───────┘
+                                 │  WS2812 LED    │                     │
+┌──────────────┐                 │  Push button   │              ┌──────▼───────┐
+│   Button     │ ──────────────→ │  (active low)  │              │  Home        │
+│   (GPIO4)    │   INT + PU      └───────────────┘              │  Assistant   │
+└──────────────┘                                                 │  play_media  │
+                                                                 └──────────────┘
+```
+
+### LED Status
+
+| Color | Meaning |
+|-------|---------|
+| 🟢 Green | Ready (WiFi connected, idle) |
+| 🔴 Red blinking | WiFi disconnected |
+| 🔵 Blue | Recording |
+| ⚪ White blinking | Uploading |
+| 🟢 Flash ×4 | Upload success |
+| 🔴 Flash ×4 | Upload failed |
+
+### Recording behavior
+
+- **Hold to talk**: press button → record, release → send
+- **Minimum recording**: 500ms (shorter taps are discarded)
+- **Maximum recording**: 10 seconds (safety cutoff)
+- **Format**: 16-bit PCM WAV, 16kHz mono
+
+## Project Structure
+
+```
+esp32-intercom-button/
+├── platformio.ini          # PlatformIO project config
+├── docker/
+│   ├── Dockerfile           # Self-contained dev image (3GB)
+│   ├── .docker-image        # Version tag
+│   └── dev.sh               # One-command dev container
+└── src/
+    ├── config.h             # WiFi, server IP, room name
+    ├── main.cpp             # State machine: IDLE→RECORD→UPLOAD
+    ├── wifi_manager.h/cpp   # Non-blocking WiFi + auto-reconnect
+    ├── audio_recorder.h/cpp # 16kHz timer ISR → PSRAM → WAV
+    └── http_uploader.h/cpp  # POST /convert?target=<room>
+```
+
+## Dependencies
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| Adafruit NeoPixel | ^1.12.0 | WS2812 RGB LED control |
+| Arduino-ESP32 | ~3.20017.0 | HAL, WiFi, HTTPClient |
+| ESP32-S3 toolchain | 8.4.0+2021r2 | Xtensa + RISC-V compilers |
+
+All managed by PlatformIO — no manual installation needed.
+
+## Debugging
+
+### Serial monitor
+
+```bash
+pio device monitor
+```
+
+The firmware logs every state transition:
+
+```
+[wifi] Connecting to MyWiFi...
+[wifi] Connected — RSSI: -45 dBm
+[audio] Ready: 160000 samples (10 sec), PSRAM free: 7654 KB
+[main] Setup complete — ready.
+[main] Recording...
+[audio] Stopped — 48000 samples (3.0s)
+[audio] WAV header written — 96044 bytes
+[upload] POST http://192.168.99.x:8764/convert?target=书房 (96044 bytes)
+[upload] Server: {"ok":true,"name":"书房","rooms_sent":1,...}
+[main] Upload OK (234 ms)
+```
+
+### Common issues
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| Red LED blinking | WiFi can't connect | Check SSID/password in `config.h` |
+| Upload fails | Wrong USB port | `pio device list`, then `-upload-port /dev/ttyUSB0` |
+| Recording but no upload | Server unreachable | Check `SERVER_HOST` in `config.h` |
+| Upload OK but no sound | Wrong room name | Verify `ROOM_TARGET` matches `rooms.json` |
+| PSRAM allocation warning | Board variant misdetected | Try `board = esp32-s3-devkitm-1` in `platformio.ini` |
+
+### Inspect build details
+
+```bash
+# Show all compiler flags
+pio run -v 2>&1 | grep -E "^-D|^-I|^-m"
+
+# Show memory usage
+pio run -t size
+
+# Clean rebuild
+pio run -t clean && pio run
+```
+
+## License
+
+MIT
