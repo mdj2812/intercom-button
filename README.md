@@ -43,7 +43,7 @@ Room keys (from `rooms.json`): `study`, `living`, `cinema`, `bedroom`, or `all` 
 
 Copy `data/config.example.json` to `data/config.json` and fill in your settings. `data/config.json` is gitignored — credentials stay local.
 
-**Multi-button setup**: flash firmware once, then for each device edit `data/config.json` (change `room`) and run `pio run -t uploadfs`.
+**Multi-button setup**: flash firmware once, then for each device edit `data/config.json` (change `room`) and run `pio run -e esp32-s3-devkitc-1 -t uploadfs`.
 
 ## Quick Start
 
@@ -61,13 +61,19 @@ Then inside the container:
 
 ```bash
 # First time: flash firmware + configuration
-pio run -t upload        # flash firmware
+pio run -e esp32-s3-devkitc-1 -t upload        # flash firmware
 # Edit data/config.json with your WiFi & room
-pio run -t uploadfs      # flash LittleFS config
+pio run -e esp32-s3-devkitc-1 -t uploadfs      # flash LittleFS config
 
-# Subsequent: just recompile
-pio run
-pio run -t upload
+# Unit tests (no hardware needed)
+pio test -e native
+
+# Static analysis
+pio check -e esp32-s3-devkitc-1
+
+# Recompile after changes
+pio run -e esp32-s3-devkitc-1
+pio run -e esp32-s3-devkitc-1 -t upload
 pio device monitor
 ```
 
@@ -77,35 +83,45 @@ Requires [PlatformIO Core](https://platformio.org/install/cli):
 
 ```bash
 pip install platformio
-pio run
-pio run -t upload
-pio device monitor
+
+# Compile & flash firmware
+pio run -e esp32-s3-devkitc-1
+pio run -e esp32-s3-devkitc-1 -t upload
+pio run -e esp32-s3-devkitc-1 -t uploadfs   # flash LittleFS config
+
+# Unit tests (no hardware needed)
+pio test -e native
+
+# Static analysis
+pio check -e esp32-s3-devkitc-1
 ```
 
 ## Commands
 
 | Command | What it does |
 |---------|-------------|
-| `pio run` | Compile firmware |
-| `pio run -t upload` | Compile + flash via USB |
-| `pio run -t clean` | Clean build artifacts |
+| `pio run -e esp32-s3-devkitc-1` | Compile firmware for ESP32-S3 |
+| `pio run -e esp32-s3-devkitc-1 -t upload` | Compile + flash via USB |
+| `pio run -e esp32-s3-devkitc-1 -t uploadfs` | Upload LittleFS config (`data/config.json`) |
+| `pio run -e esp32-s3-devkitc-1 -t clean` | Clean build artifacts |
+| `pio test -e native` | Run unit tests on host (no ESP32 needed) |
+| `pio check -e esp32-s3-devkitc-1` | Static analysis (cppcheck) |
 | `pio device monitor` | Open serial monitor (Ctrl+C to exit) |
 | `pio device monitor -b 115200` | Serial monitor with explicit baud rate |
 | `pio device list` | List connected serial devices |
-| `pio check` | Static analysis / lint |
-| `pio run -v` | Verbose build (see exact compiler flags) |
+| `pio run -v -e esp32-s3-devkitc-1` | Verbose build (see exact compiler flags) |
 
 ### Flash via USB (first time)
 
 1. Connect ESP32-S3 via USB-C
 2. Check device: `ls /dev/ttyUSB*` or `ls /dev/ttyACM*`
-3. `pio run -t upload`
+3. `pio run -e esp32-s3-devkitc-1 -t upload`
 4. PlatformIO auto-detects the port and flashes
 
 If auto-detect fails, specify the port:
 
 ```bash
-pio run -t upload --upload-port /dev/ttyUSB0
+pio run -e esp32-s3-devkitc-1 -t upload --upload-port /dev/ttyUSB0
 ```
 
 ### Docker-specific
@@ -115,8 +131,10 @@ pio run -t upload --upload-port /dev/ttyUSB0
 ./docker/dev.sh
 
 # Run a single command
-./docker/dev.sh pio run
-./docker/dev.sh pio run -t upload
+./docker/dev.sh pio run -e esp32-s3-devkitc-1
+./docker/dev.sh pio run -e esp32-s3-devkitc-1 -t upload
+./docker/dev.sh pio test -e native
+./docker/dev.sh pio check -e esp32-s3-devkitc-1
 
 # Rebuild Docker image locally
 ./docker/dev.sh -b
@@ -171,12 +189,31 @@ esp32-intercom-button/
 │   ├── config.example.json  # Template (committed)
 │   └── config.json          # Your settings (gitignored, uploaded to LittleFS)
 └── src/
-    ├── config.h             # Pin definitions (compile-time)
-    ├── config_manager.h/cpp # JSON config loader (LittleFS)
     ├── main.cpp             # State machine: IDLE→RECORD→UPLOAD
+    ├── config_manager.h/cpp # JSON config loader (LittleFS)
     ├── wifi_manager.h/cpp   # Non-blocking WiFi + auto-reconnect
     ├── audio_recorder.h/cpp # 16kHz timer ISR → PSRAM → WAV
     └── http_uploader.h/cpp  # POST /convert?target=<room>
+```
+
+## Environments
+
+This project has **two PlatformIO environments** — always specify which one to use:
+
+| Environment | Platform | Purpose |
+|-------------|----------|---------|
+| `esp32-s3-devkitc-1` | xtensa-esp32s3 | Firmware — compile, flash, monitor |
+| `native` | x86_64 Linux | Unit tests — run on host, no ESP32 needed |
+
+Without `-e`, `pio run` builds **both** environments. The native env has `src_filter = -<src/*>` so it only compiles test files — never Arduino-dependent source code.
+
+```bash
+# ✅ Correct
+pio run -e esp32-s3-devkitc-1
+pio test -e native
+
+# ❌ Wrong — tries to build native too, causing Arduino.h errors
+pio run
 ```
 
 ## Dependencies
@@ -231,13 +268,13 @@ The firmware logs every state transition:
 
 ```bash
 # Show all compiler flags
-pio run -v 2>&1 | grep -E "^-D|^-I|^-m"
+pio run -v -e esp32-s3-devkitc-1 2>&1 | grep -E "^-D|^-I|^-m"
 
 # Show memory usage
-pio run -t size
+pio run -e esp32-s3-devkitc-1 -t size
 
 # Clean rebuild
-pio run -t clean && pio run
+pio run -e esp32-s3-devkitc-1 -t clean && pio run -e esp32-s3-devkitc-1
 ```
 
 ## License
