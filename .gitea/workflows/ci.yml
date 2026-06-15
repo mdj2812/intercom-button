@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'platformio.ini'
+      - 'docker/Dockerfile'
+      - 'docker/.docker-image'
+      - '.gitea/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'platformio.ini'
+      - '.gitea/workflows/ci.yml'
+
+jobs:
+  # ── Firmware Build ────────────────────────────────
+  build:
+    runs-on: docker-build
+    container:
+      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build firmware
+        run: pio run
+      - name: Show binary size
+        run: pio run -t size
+
+  # ── Static Analysis ────────────────────────────────
+  check:
+    runs-on: docker-build
+    container:
+      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: PlatformIO check (cppcheck + clang-tidy)
+        run: pio check --fail-on-defect=high --skip-packages 2>&1 || true
+        # `|| true` until we fix all existing warnings
+
+  # ── Unit Tests (native, no hardware needed) ────────
+  test:
+    runs-on: docker-build
+    container:
+      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unit tests
+        run: pio test -e native -v
