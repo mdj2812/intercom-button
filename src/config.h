@@ -10,7 +10,7 @@
 #define API_PATH      "/convert"
 
 // ──── Room target — change per device ───────────────
-#define ROOM_TARGET   "书房"
+#define ROOM_TARGET   "study"    // 书房 (key from rooms.json)
 
 // ──── Audio ─────────────────────────────────────────
 #define SAMPLE_RATE     16000      // Hz
