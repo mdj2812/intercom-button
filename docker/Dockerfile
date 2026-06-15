@@ -1,9 +1,11 @@
-# Build the dev image:
-#   docker build --network host -t esp32-pio-builder:v1.0.0 -f docker/Dockerfile .
+# Build:
+#   docker build \
+#     --build-context pio-cache=$HOME/.platformio \
+#     --network host \
+#     -t esp32-pio-builder:v1.0.1 \
+#     -f docker/Dockerfile .
 #
-# The image contains PlatformIO + ESP32 platform metadata.
-# Toolchains (xtensa-esp32s3, riscv32-esp) are mounted from the host
-# at runtime via dev.sh, because PlatformIO's CDN is unreliable.
+# Or use dev.sh which handles this automatically.
 FROM ubuntu:22.04
 
 # ── Use TUNA mirrors ────────────────────────────────
@@ -23,9 +25,21 @@ RUN pip3 install --no-cache-dir \
     platformio
 
 # ── Pre-install ESP32 platform metadata ─────────────
-# Downloads platform definition + framework (~100MB).
-# Toolchains are mounted from host at runtime.
 RUN pio platform install "espressif32"
+
+# ── Copy toolchains + framework from host ───────────
+# These total ~1.8GB. Host must have them pre-downloaded
+# (run `pio run` on the host first).
+COPY --from=pio-cache packages/toolchain-xtensa-esp32s3   /root/.platformio/packages/toolchain-xtensa-esp32s3
+COPY --from=pio-cache packages/toolchain-riscv32-esp      /root/.platformio/packages/toolchain-riscv32-esp
+COPY --from=pio-cache packages/framework-arduinoespressif32 /root/.platformio/packages/framework-arduinoespressif32
+COPY --from=pio-cache packages/tool-esptoolpy              /root/.platformio/packages/tool-esptoolpy
+COPY --from=pio-cache packages/tool-scons                  /root/.platformio/packages/tool-scons
+
+# ── Verify toolchains ────────────────────────────────
+RUN /root/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-gcc --version && \
+    /root/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-gcc --version && \
+    echo "All toolchains OK"
 
 # ── Workspace ───────────────────────────────────────
 WORKDIR /workspace
