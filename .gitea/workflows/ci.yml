@@ -23,7 +23,7 @@ jobs:
   build:
     runs-on: check
     container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.5
+      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.6
     steps:
       - uses: actions/checkout@v4
       - name: Build firmware
@@ -35,7 +35,7 @@ jobs:
   check:
     runs-on: check
     container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.5
+      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.6
     steps:
       - uses: actions/checkout@v4
       - name: PlatformIO check (cppcheck)
@@ -45,7 +45,7 @@ jobs:
   test:
     runs-on: check
     container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.5
+      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.6
     steps:
       - uses: actions/checkout@v4
       - name: Run unit tests

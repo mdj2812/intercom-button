@@ -46,6 +46,9 @@ COPY --from=pio-cache packages/tool-esptoolpy              /root/.platformio/pac
 COPY --from=pio-cache packages/tool-openocd-esp32           /root/.platformio/packages/tool-openocd-esp32
 COPY --from=pio-cache packages/tool-cppcheck               /root/.platformio/packages/tool-cppcheck
 COPY --from=pio-cache packages/tool-scons                  /root/.platformio/packages/tool-scons
+COPY --from=pio-cache packages/tool-mkspiffs               /root/.platformio/packages/tool-mkspiffs
+COPY --from=pio-cache packages/tool-mklittlefs             /root/.platformio/packages/tool-mklittlefs
+COPY --from=pio-cache packages/tool-mkfatfs                /root/.platformio/packages/tool-mkfatfs
 
 # ── Verify toolchains ────────────────────────────────
 RUN /root/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-gcc --version && \
