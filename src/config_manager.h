@@ -13,7 +13,7 @@ bool begin();
 const char* wifi_ssid();
 const char* wifi_password();
 const char* server_host();
-uint16_t    server_port();
+uint16_t server_port();
 const char* room_target();
 
 // Audio settings (read-only after boot)

@@ -2,12 +2,12 @@
 
 namespace WiFiManager {
 
-static const char *TAG = "wifi";
+static const char* TAG = "wifi";
 
 static unsigned long next_reconnect_ms = 0;
 static const unsigned long RECONNECT_INTERVAL = 5000; // retry every 5s
 
-void begin(const char *ssid, const char *password) {
+void begin(const char* ssid, const char* password) {
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
     WiFi.begin(ssid, password);
@@ -31,18 +31,25 @@ bool update() {
 }
 
 int rssi() {
-    if (WiFi.status() != WL_CONNECTED) return 0;
+    if (WiFi.status() != WL_CONNECTED)
+        return 0;
     return WiFi.RSSI();
 }
 
-const char *status_str() {
+const char* status_str() {
     switch (WiFi.status()) {
-        case WL_CONNECTED:      return "connected";
-        case WL_NO_SSID_AVAIL:  return "no_ssid";
-        case WL_CONNECT_FAILED: return "connect_failed";
-        case WL_IDLE_STATUS:    return "idle";
-        case WL_DISCONNECTED:   return "disconnected";
-        default:                return "unknown";
+        case WL_CONNECTED:
+            return "connected";
+        case WL_NO_SSID_AVAIL:
+            return "no_ssid";
+        case WL_CONNECT_FAILED:
+            return "connect_failed";
+        case WL_IDLE_STATUS:
+            return "idle";
+        case WL_DISCONNECTED:
+            return "disconnected";
+        default:
+            return "unknown";
     }
 }
 

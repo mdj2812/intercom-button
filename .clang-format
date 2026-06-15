@@ -1,0 +1,66 @@
+# Consistent with existing code style:
+# - 4-space indent
+# - Brace on same line (Attach)
+# - Pointer/reference aligned left
+# - 120-char line limit
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+
+# ── Braces ────────────────────────────────────────
+BreakBeforeBraces: Attach
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeElse: false
+  BeforeCatch: false
+
+# ── Spacing ────────────────────────────────────────
+PointerAlignment: Left
+ReferenceAlignment: Left
+SpaceAfterCStyleCast: true
+SpaceBeforeParens: ControlStatements
+
+# ── Includes ───────────────────────────────────────
+SortIncludes: true
+IncludeBlocks: Preserve
+IncludeCategories:
+  # Project headers — keep grouped at top after system includes
+  - Regex: '^".*"'
+    Priority: 1
+  # Arduino / ESP-IDF / Framework headers
+  - Regex: '^<(Arduino|driver|esp_|soc/|hal/).*>'
+    Priority: 2
+  # Other system headers
+  - Regex: '^<(cstd|WiFi|HTTP|Adafruit|ArduinoJson).*>'
+    Priority: 3
+  # Everything else
+  - Regex: '.*'
+    Priority: 4
+
+# ── Alignment ──────────────────────────────────────
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignTrailingComments: true
+
+# ── Misc ───────────────────────────────────────────
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBinaryOperators: None
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 4
+IndentCaseLabels: true
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: None
+ReflowComments: false
+SpacesInContainerLiterals: false

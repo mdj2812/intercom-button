@@ -10,6 +10,8 @@
 #   make check       静态分析
 #   make clean       清理构建产物
 #   make size        显示固件体积
+#   make format      自动格式化代码
+#   make format-check 检查代码格式（CI 用）
 #
 # 通过 Docker 运行（替代裸机 pio）：
 #   make docker-shell   进入 Docker 开发环境
@@ -20,7 +22,7 @@
 ENV      := esp32-s3-devkitc-1
 PIO      := pio
 
-.PHONY: all build flash flashfs monitor test check clean size \
+.PHONY: all build flash flashfs monitor test check clean size format format-check \
         docker-build docker-flash docker-flashfs docker-test docker-check docker-monitor docker-shell
 
 # ── 裸机命令 ────────────────────────────────────────
@@ -50,6 +52,13 @@ clean:
 
 size:
 	$(PIO) run -e $(ENV) -t size
+
+# ── Code formatting ──────────────────────────────────
+format:
+	clang-format -i src/*.cpp src/*.h $$(find test -name '*.cpp')
+
+format-check:
+	clang-format --dry-run -Werror src/*.cpp src/*.h $$(find test -name '*.cpp')
 
 # ── Docker 命令（通过 dev.sh，自动处理镜像拉取和 USB 设备挂载）─
 

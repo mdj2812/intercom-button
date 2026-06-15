@@ -1,7 +1,7 @@
 #include <ArduinoJson.h>
-#include <fstream>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <unity.h>
 
 /// Minimal ConfigManager-like JSON loading for native tests.
@@ -10,7 +10,9 @@
 static const char* TEST_FILE = "/tmp/test_config.json";
 
 void setUp() {}
-void tearDown() { std::remove(TEST_FILE); }
+void tearDown() {
+    std::remove(TEST_FILE);
+}
 
 static void write_json(const char* json) {
     std::ofstream f(TEST_FILE);
@@ -99,27 +101,27 @@ void test_invalid_json_handled() {
 void test_wav_header_structure() {
     // Generate a minimal WAV header for 16000 Hz, 16-bit mono, 1000 samples
     uint32_t sample_rate = 16000;
-    uint32_t data_size   = 1000 * 2; // 1000 samples × 2 bytes (16-bit)
-    uint32_t file_size   = 36 + data_size;
+    uint32_t data_size = 1000 * 2; // 1000 samples × 2 bytes (16-bit)
+    uint32_t file_size = 36 + data_size;
     uint16_t block_align = 2;
-    uint32_t byte_rate   = sample_rate * block_align;
+    uint32_t byte_rate = sample_rate * block_align;
 
     uint8_t header[44] = {0};
 
     auto w32 = [&](int off, uint32_t v) { memcpy(header + off, &v, 4); };
     auto w16 = [&](int off, uint16_t v) { memcpy(header + off, &v, 2); };
 
-    memcpy(header,      "RIFF", 4);
-    w32(4,  file_size);
-    memcpy(header + 8,  "WAVE", 4);
+    memcpy(header, "RIFF", 4);
+    w32(4, file_size);
+    memcpy(header + 8, "WAVE", 4);
     memcpy(header + 12, "fmt ", 4);
     w32(16, 16);
-    w16(20, 1);    // PCM
-    w16(22, 1);    // mono
+    w16(20, 1); // PCM
+    w16(22, 1); // mono
     w32(24, sample_rate);
     w32(28, byte_rate);
     w16(32, block_align);
-    w16(34, 16);   // bits per sample
+    w16(34, 16); // bits per sample
     memcpy(header + 36, "data", 4);
     w32(40, data_size);
 
@@ -150,10 +152,14 @@ void test_wav_header_structure() {
 
 void test_wav_header_sizes() {
     // Different settings should produce correct sizes
-    struct { uint32_t sr; uint32_t samples; uint32_t expected_data; } cases[] = {
-        {8000,  500,  1000},   // 0.5s of 8kHz → 1000 bytes
-        {16000, 1000, 2000},   // 1s of 16kHz → 2000 bytes
-        {44100, 4410, 8820},   // 0.1s of 44.1kHz → 8820 bytes
+    struct {
+        uint32_t sr;
+        uint32_t samples;
+        uint32_t expected_data;
+    } cases[] = {
+        {8000, 500, 1000},        // 0.5s of 8kHz → 1000 bytes
+        {16000, 1000, 2000},      // 1s of 16kHz → 2000 bytes
+        {44100, 4410, 8820},      // 0.1s of 44.1kHz → 8820 bytes
         {16000, 960000, 1920000}, // 60s of 16kHz → ~1.92MB
     };
 

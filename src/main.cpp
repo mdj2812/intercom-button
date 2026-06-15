@@ -13,16 +13,16 @@
  *   - Push button (GPIO4→GND, active low, internal pull-up)
  */
 
+#include "audio_recorder.h"
+#include "config.h" // pin defines only
+#include "config_manager.h"
+#include "http_uploader.h"
+#include "wifi_manager.h"
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
-#include "config.h"            // pin defines only
-#include "config_manager.h"
-#include "wifi_manager.h"
-#include "audio_recorder.h"
-#include "http_uploader.h"
 
 // ── Globals ─────────────────────────────────────────
-static AudioRecorder    recorder;
+static AudioRecorder recorder;
 static Adafruit_NeoPixel led(1, PIN_LED_WS2812, NEO_GRB + NEO_KHZ800);
 
 enum class State { IDLE, RECORDING, UPLOADING };
@@ -67,21 +67,19 @@ void setup() {
     ConfigManager::begin();
     MAX_RECORD_MS = ConfigManager::max_record_secs() * 1000UL;
 
-    Serial.printf("Room: %s | Server: %s:%u | Max: %us\n",
-                  ConfigManager::room_target(),
-                  ConfigManager::server_host(),
-                  ConfigManager::server_port(),
-                  ConfigManager::max_record_secs());
+    Serial.printf("Room: %s | Server: %s:%u | Max: %us\n", ConfigManager::room_target(), ConfigManager::server_host(),
+                  ConfigManager::server_port(), ConfigManager::max_record_secs());
 
     // ── WiFi ────────────────────────────────────────
-    WiFiManager::begin(ConfigManager::wifi_ssid(),
-                       ConfigManager::wifi_password());
+    WiFiManager::begin(ConfigManager::wifi_ssid(), ConfigManager::wifi_password());
 
     // ── Audio recorder ──────────────────────────────
-    if (!recorder.begin(ConfigManager::sample_rate(),
-                        ConfigManager::max_record_secs())) {
+    if (!recorder.begin(ConfigManager::sample_rate(), ConfigManager::max_record_secs())) {
         Serial.println("FATAL: AudioRecorder init failed");
-        while (1) { led_blink(255, 0, 0, 200); delay(10); }
+        while (1) {
+            led_blink(255, 0, 0, 200);
+            delay(10);
+        }
     }
 
     Serial.println("Setup complete — ready.");
@@ -95,77 +93,71 @@ void loop() {
 
     switch (state) {
 
-    case State::IDLE: {
-        if (!wifi_ok) {
-            led_blink(255, 0, 0, 500);
-        } else {
-            led_set(0, 255, 0);
-        }
-
-        if (btn && !last_button && wifi_ok) {
-            recorder.start();
-            record_start_ms = millis();
-            led_set(0, 0, 255);
-            state = State::RECORDING;
-            Serial.println("[main] Recording...");
-        }
-        break;
-    }
-
-    case State::RECORDING: {
-        led_set(0, 0, 255);
-        unsigned long elapsed = millis() - record_start_ms;
-
-        if (elapsed >= MAX_RECORD_MS) {
-            Serial.println("[main] Max time reached — stopping");
-            goto stop_and_upload;
-        }
-
-        if (!btn && last_button) {
-            Serial.printf("[main] Released after %lu ms\n", elapsed);
-stop_and_upload:
-            recorder.stop();
-
-            if (elapsed < MIN_RECORD_MS) {
-                Serial.println("[main] Too short — discarding");
+        case State::IDLE: {
+            if (!wifi_ok) {
+                led_blink(255, 0, 0, 500);
+            } else {
                 led_set(0, 255, 0);
-                state = State::IDLE;
-                break;
             }
 
-            recorder.write_wav_header();
-            upload_start_ms = millis();
-            state = State::UPLOADING;
-            Serial.println("[main] Uploading...");
-        }
-        break;
-    }
-
-    case State::UPLOADING: {
-        led_blink(255, 255, 255, 100);
-
-        bool ok = HTTPUploader::upload(
-            recorder.data(),
-            recorder.total_bytes(),
-            ConfigManager::server_host(),
-            ConfigManager::server_port(),
-            ConfigManager::room_target()
-        );
-
-        unsigned long upload_ms = millis() - upload_start_ms;
-        Serial.printf("[main] Upload %s (%lu ms)\n",
-                      ok ? "OK" : "FAILED", upload_ms);
-
-        for (int i = 0; i < 4; i++) {
-            led_set(ok ? 0 : 255, ok ? 255 : 0, 0);
-            delay(125);
-            led_set(0, 0, 0);
-            delay(125);
+            if (btn && !last_button && wifi_ok) {
+                recorder.start();
+                record_start_ms = millis();
+                led_set(0, 0, 255);
+                state = State::RECORDING;
+                Serial.println("[main] Recording...");
+            }
+            break;
         }
 
-        state = State::IDLE;
-        break;
-    }
+        case State::RECORDING: {
+            led_set(0, 0, 255);
+            unsigned long elapsed = millis() - record_start_ms;
+
+            if (elapsed >= MAX_RECORD_MS) {
+                Serial.println("[main] Max time reached — stopping");
+                goto stop_and_upload;
+            }
+
+            if (!btn && last_button) {
+                Serial.printf("[main] Released after %lu ms\n", elapsed);
+            stop_and_upload:
+                recorder.stop();
+
+                if (elapsed < MIN_RECORD_MS) {
+                    Serial.println("[main] Too short — discarding");
+                    led_set(0, 255, 0);
+                    state = State::IDLE;
+                    break;
+                }
+
+                recorder.write_wav_header();
+                upload_start_ms = millis();
+                state = State::UPLOADING;
+                Serial.println("[main] Uploading...");
+            }
+            break;
+        }
+
+        case State::UPLOADING: {
+            led_blink(255, 255, 255, 100);
+
+            bool ok = HTTPUploader::upload(recorder.data(), recorder.total_bytes(), ConfigManager::server_host(),
+                                           ConfigManager::server_port(), ConfigManager::room_target());
+
+            unsigned long upload_ms = millis() - upload_start_ms;
+            Serial.printf("[main] Upload %s (%lu ms)\n", ok ? "OK" : "FAILED", upload_ms);
+
+            for (int i = 0; i < 4; i++) {
+                led_set(ok ? 0 : 255, ok ? 255 : 0, 0);
+                delay(125);
+                led_set(0, 0, 0);
+                delay(125);
+            }
+
+            state = State::IDLE;
+            break;
+        }
 
     } // switch
 
