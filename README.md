@@ -41,6 +41,8 @@ The same firmware binary works for all rooms — just upload a different config 
 
 Room keys (from `rooms.json`): `study`, `living`, `cinema`, `bedroom`, or `all` for broadcast.
 
+Copy `data/config.example.json` to `data/config.json` and fill in your settings. `data/config.json` is gitignored — credentials stay local.
+
 **Multi-button setup**: flash firmware once, then for each device edit `data/config.json` (change `room`) and run `pio run -t uploadfs`.
 
 ## Quick Start
@@ -153,7 +155,7 @@ pio run -t upload --upload-port /dev/ttyUSB0
 
 - **Hold to talk**: press button → record, release → send
 - **Minimum recording**: 500ms (shorter taps are discarded)
-- **Maximum recording**: 10 seconds (safety cutoff)
+- **Maximum recording**: configured in `data/config.json` (`max_record_secs`, default 60 seconds)
 - **Format**: 16-bit PCM WAV, 16kHz mono
 
 ## Project Structure
@@ -166,7 +168,8 @@ esp32-intercom-button/
 │   ├── .docker-image        # Full registry path (source of truth)
 │   └── dev.sh               # One-command dev container
 ├── data/
-│   └── config.json          # Per-device runtime config (LittleFS)
+│   ├── config.example.json  # Template (committed)
+│   └── config.json          # Your settings (gitignored, uploaded to LittleFS)
 └── src/
     ├── config.h             # Pin definitions (compile-time)
     ├── config_manager.h/cpp # JSON config loader (LittleFS)
@@ -181,7 +184,8 @@ esp32-intercom-button/
 | Library | Version | Purpose |
 |---------|---------|---------|
 | Adafruit NeoPixel | ^1.12.0 | WS2812 RGB LED control |
-| Arduino-ESP32 | ~3.20017.0 | HAL, WiFi, HTTPClient |
+| ArduinoJson | ^6.21.0 | JSON config parsing |
+| Arduino-ESP32 | ~3.20017.0 | HAL, WiFi, HTTPClient, LittleFS |
 | ESP32-S3 toolchain | 8.4.0+2021r2 | Xtensa + RISC-V compilers |
 
 All managed by PlatformIO — no manual installation needed.
@@ -197,27 +201,31 @@ pio device monitor
 The firmware logs every state transition:
 
 ```
+=== ESP32-S3 Intercom Button ===
+[cfg] Loaded: room=study server=192.168.99.10:8764 wifi=MyWiFi
 [wifi] Connecting to MyWiFi...
-[wifi] Connected — RSSI: -45 dBm
-[audio] Ready: 160000 samples (10 sec), PSRAM free: 7654 KB
+[wifi] Connected
+[audio] Buffer: 960000 samples (60 sec), PSRAM free: 7654 KB
+[audio] Ready — ISR @ 16000 Hz
 [main] Setup complete — ready.
 [main] Recording...
 [audio] Stopped — 48000 samples (3.0s)
-[audio] WAV header written — 96044 bytes
-[upload] POST http://192.168.99.x:8764/convert?target=书房 (96044 bytes)
-[upload] Server: {"ok":true,"name":"书房","rooms_sent":1,...}
-[main] Upload OK (234 ms)
+[upload] POST http://192.168.99.10:8764/convert?target=study (96044 bytes) attempt 1/3
+[upload] OK: {"ok":true,"rooms_sent":1,...}
+[main] Upload OK (1725 ms)
 ```
 
 ### Common issues
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| Red LED blinking | WiFi can't connect | Check SSID/password in `config.h` |
-| Upload fails | Wrong USB port | `pio device list`, then `-upload-port /dev/ttyUSB0` |
-| Recording but no upload | Server unreachable | Check `SERVER_HOST` in `config.h` |
-| Upload OK but no sound | Wrong room name | Verify `ROOM_TARGET` matches `rooms.json` |
-| PSRAM allocation warning | Board variant misdetected | Try `board = esp32-s3-devkitm-1` in `platformio.ini` |
+| Red LED blinking | WiFi can't connect | Check SSID/password in `data/config.json`, re-upload with `pio run -t uploadfs` |
+| Upload fails | Wrong USB port | `pio device list`, then `pio run -t upload --upload-port /dev/ttyUSB0` |
+| Recording but no upload | Server unreachable | Check `server_host` in `data/config.json` |
+| Upload timeout (ESP32 says failed but audio played) | HA response too slow | Known benign issue — audio was delivered, retry logic handles it |
+| Upload OK but no sound | Wrong room key | Verify `room` in `data/config.json` matches a key in `rooms.json` (`study`/`living`/`cinema`/`bedroom`) |
+| Config not loading | LittleFS not flashed | Run `pio run -t uploadfs` to upload the file system |
+| PSRAM allocation warning | Board variant mismatch | Verify `board_build.psram_type = opi` in `platformio.ini` |
 
 ### Inspect build details
 
