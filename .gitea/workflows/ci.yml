@@ -27,9 +27,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build firmware
-        run: pio run
+        run: pio run -e esp32-s3-devkitc-1
       - name: Show binary size
-        run: pio run -t size
+        run: pio run -e esp32-s3-devkitc-1 -t size
 
   # ── Static Analysis ────────────────────────────────
   check:
@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: PlatformIO check (cppcheck)
-        run: pio check --fail-on-defect=high --skip-packages 2>&1 || true
+        run: pio check -e esp32-s3-devkitc-1 --fail-on-defect=high --skip-packages 2>&1 || true
 
   # ── Unit Tests (native, no hardware needed) ────────
   test:
