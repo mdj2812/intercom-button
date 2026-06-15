@@ -16,7 +16,7 @@
 #define SAMPLE_RATE     16000      // Hz
 #define BITS_PER_SAMPLE 16
 #define NUM_CHANNELS    1
-#define MAX_RECORD_SECS 10         // safety timeout
+#define MAX_RECORD_SECS 60         // safety timeout
 
 // ──── Pin mapping ───────────────────────────────────
 #define PIN_BUTTON      4          // GPIO4 → button (active low, internal pull-up)
