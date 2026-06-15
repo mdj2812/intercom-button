@@ -57,6 +57,8 @@ make monitor    # serial monitor
 make test       # run unit tests (no hardware needed)
 make check      # static analysis
 make clean      # clean build artifacts
+make format     # auto-format code
+make size       # show firmware memory usage
 ```
 
 ### Docker
@@ -93,6 +95,8 @@ make flash
 | `make test` | Run unit tests on host (no ESP32 needed) |
 | `make check` | Static analysis (cppcheck) |
 | `make clean` | Clean build artifacts |
+| `make format` | Auto-format code with clang-format |
+| `make format-check` | Check formatting (CI) |
 | `make size` | Show firmware memory usage |
 
 Docker variants: prefix with `docker-` (e.g. `make docker-build`, `make docker-flash`).
@@ -170,16 +174,25 @@ make docker-shell
 
 ```
 esp32-intercom-button/
-├── platformio.ini          # PlatformIO project config
+├── .clang-format            # C++ code style rules
+├── .editorconfig            # Editor settings
+├── Makefile                 # Convenience commands
+├── platformio.ini           # PlatformIO project config
+├── .gitea/
+│   └── workflows/ci.yml     # CI pipeline (build, check, test, format)
 ├── docker/
-│   ├── Dockerfile           # Self-contained dev image (3GB)
-│   ├── .docker-image        # Full registry path (source of truth)
+│   ├── Dockerfile           # Self-contained dev image
+│   ├── .docker-image        # Full registry path + version
 │   └── dev.sh               # One-command dev container
 ├── data/
 │   ├── config.example.json  # Template (committed)
 │   └── config.json          # Your settings (gitignored, uploaded to LittleFS)
+├── test/
+│   └── test_config/
+│       └── test_main.cpp    # Unit tests (JSON + WAV header)
 └── src/
     ├── main.cpp             # State machine: IDLE→RECORD→UPLOAD
+    ├── config.h             # Pin definitions
     ├── config_manager.h/cpp # JSON config loader (LittleFS)
     ├── wifi_manager.h/cpp   # Non-blocking WiFi + auto-reconnect
     ├── audio_recorder.h/cpp # 16kHz timer ISR → PSRAM → WAV
@@ -216,6 +229,17 @@ pio run                 # (unless you specify -e)
 | ESP32-S3 toolchain | 8.4.0+2021r2 | Xtensa + RISC-V compilers |
 
 All managed by PlatformIO — no manual installation needed.
+
+## Code Style
+
+C++ code follows [`.clang-format`](.clang-format) (LLVM-based, 4-space indent, 120-char limit). Editor settings in [`.editorconfig`](.editorconfig).
+
+```bash
+make format        # auto-format all source files
+make format-check  # check formatting without modifying (CI)
+```
+
+CI enforces formatting — PRs with style violations will fail the `format` job.
 
 ## Debugging
 
