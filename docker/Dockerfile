@@ -9,8 +9,6 @@ RUN sed -i 's|http://archive.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /
     sed -i 's|http://security.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
 
 # ── System dependencies ─────────────────────────────
-# python3-dev + build-essential for PlatformIO native extensions
-# udev + usbutils for USB device access (flashing)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv python3-dev \
     git curl wget ca-certificates \
@@ -18,27 +16,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ── PlatformIO Core ─────────────────────────────────
-# Use Tsinghua PyPI mirror for faster install
 RUN pip3 install --no-cache-dir \
     -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple \
     platformio
 
 # ── Pre-install ESP32-S3 toolchain + framework ──────
-# This downloads ~500MB of toolchains (xtensa-esp32s3, riscv32-esp),
-# the Arduino-ESP32 framework, and the platform itself.
-# Without this, first `pio run` takes 5-10 minutes.
 RUN pio platform install "espressif32"
 
-# ── Dev user ────────────────────────────────────────
-# Non-root user for safety; dialout group for USB serial access
-RUN useradd -m -s /bin/bash dev && \
-    echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
-    usermod -a -G dialout dev
-
-USER dev
+# ── Workspace ───────────────────────────────────────
+# Root user (simplifies volume mount permissions)
 WORKDIR /workspace
-
-# ── PlatformIO cache in home directory ──────────────
-ENV PLATFORMIO_CORE_DIR=/home/dev/.platformio
+ENV PLATFORMIO_CORE_DIR=/root/.platformio
 
 CMD ["/bin/bash"]
