@@ -4,7 +4,7 @@
 # Or use dev.sh which auto-builds and launches.
 FROM ubuntu:22.04
 
-# ── Use TUNA mirrors (faster in China) ─────────────
+# ── Use TUNA mirrors ────────────────────────────────
 RUN sed -i 's|http://archive.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list && \
     sed -i 's|http://security.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
 
@@ -20,11 +20,21 @@ RUN pip3 install --no-cache-dir \
     -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple \
     platformio
 
-# ── Pre-install ESP32-S3 toolchain + framework ──────
+# ── Pre-install ESP32 platform ──────────────────────
+# Downloads platform metadata + generic ESP32 toolchains.
 RUN pio platform install "espressif32"
 
+# ── Pre-warm: download board-specific toolchains ────
+# `pio platform install` only installs generic ESP32 packages.
+# Our project needs S3-specific toolchains (xtensa-esp32s3, riscv32-esp).
+# Copy project files and run `pio run` once. Compilation will fail
+# (placeholder WiFi creds), but toolchains + framework are cached.
+COPY platformio.ini /tmp/warm/
+COPY src/ /tmp/warm/src/
+RUN cd /tmp/warm && (pio run 2>&1 || true)
+RUN rm -rf /tmp/warm
+
 # ── Workspace ───────────────────────────────────────
-# Root user (simplifies volume mount permissions)
 WORKDIR /workspace
 ENV PLATFORMIO_CORE_DIR=/root/.platformio
 
