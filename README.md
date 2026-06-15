@@ -149,7 +149,7 @@ esp32-intercom-button/
 ├── platformio.ini          # PlatformIO project config
 ├── docker/
 │   ├── Dockerfile           # Self-contained dev image (3GB)
-│   ├── .docker-image        # Version tag
+│   ├── .docker-image        # Full registry path (source of truth)
 │   └── dev.sh               # One-command dev container
 └── src/
     ├── config.h             # WiFi, server IP, room name

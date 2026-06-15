@@ -16,8 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 IMAGE_FILE="$SCRIPT_DIR/.docker-image"
 IMAGE=$(head -1 "$IMAGE_FILE" | tr -d '\n\r')
-REGISTRY="registry.home.mdj2812.top"
-REGISTRY_IMAGE="${REGISTRY}/${IMAGE}"
+IMAGE_NAME="${IMAGE##*/}"  # "esp32-pio-builder:v1.0.1"
 
 FORCE_BUILD=false
 DO_PUSH=false
@@ -34,13 +33,16 @@ done
 # ── Acquire image ───────────────────────────────────
 HAVE_IMAGE=false
 if ! $FORCE_BUILD; then
-    # Try local first, then pull from registry
-    if docker image inspect "$IMAGE" &>/dev/null; then
+    # Try local first (by short name), then pull from registry
+    if docker image inspect "$IMAGE_NAME" &>/dev/null; then
+        docker tag "$IMAGE_NAME" "$IMAGE" 2>/dev/null || true
         HAVE_IMAGE=true
-    elif docker pull "$REGISTRY_IMAGE" 2>/dev/null; then
-        docker tag "$REGISTRY_IMAGE" "$IMAGE"
+    elif docker image inspect "$IMAGE" &>/dev/null; then
         HAVE_IMAGE=true
-        echo "=== Pulled from $REGISTRY ==="
+    elif docker pull "$IMAGE" 2>/dev/null; then
+        docker tag "$IMAGE" "$IMAGE_NAME"
+        HAVE_IMAGE=true
+        echo "=== Pulled $IMAGE ==="
     fi
 fi
 
@@ -50,15 +52,15 @@ if ! $HAVE_IMAGE; then
         --build-context "pio-cache=$HOME/.platformio" \
         --network host \
         -t "$IMAGE" \
+        -t "$IMAGE_NAME" \
         -f "$SCRIPT_DIR/Dockerfile" \
         "$PROJECT_ROOT"
     echo "=== Build complete ==="
 
     if $DO_PUSH; then
-        echo "=== Pushing to $REGISTRY ==="
-        docker tag "$IMAGE" "$REGISTRY_IMAGE"
-        docker push "$REGISTRY_IMAGE"
-        echo "=== Pushed: $REGISTRY_IMAGE ==="
+        echo "=== Pushing $IMAGE ==="
+        docker push "$IMAGE"
+        echo "=== Pushed ==="
     fi
 fi
 
