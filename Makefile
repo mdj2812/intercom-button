@@ -44,6 +44,25 @@ monitor:
 test:
 	$(PIO) test -e native -v
 
+# ── Coverage ────────────────────────────────────────
+test-coverage:
+	rm -rf coverage .pio/build/native/coverage
+	$(PIO) test -e native -v
+	lcov --capture \
+	    --directory .pio/build/native \
+	    --output-file coverage.info \
+	    --rc lcov_branch_coverage=1
+	lcov --remove coverage.info '*/ArduinoJson/*' '*/Unity/*' '*/unity_config*' \
+	    --output-file coverage_filtered.info
+	genhtml coverage_filtered.info \
+	    --output-directory coverage \
+	    --branch-coverage \
+	    --title "ESP32 Intercom Button — Coverage"
+	@echo ""
+	@echo "=== Coverage report: coverage/index.html ==="
+	@lcov --summary coverage_filtered.info 2>/dev/null | grep -E "lines|functions"
+	@echo ""
+
 check:
 	$(PIO) check -e $(ENV) --fail-on-defect=high --skip-packages
 
@@ -76,6 +95,9 @@ docker-flashfs:
 
 docker-test:
 	./docker/dev.sh $(PIO) test -e native -v
+
+docker-test-coverage:
+	./docker/dev.sh make test-coverage
 
 docker-check:
 	./docker/dev.sh $(PIO) check -e $(ENV) --fail-on-defect=high --skip-packages

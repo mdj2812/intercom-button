@@ -1,5 +1,23 @@
+# ── PlatformIO build artifacts ─────────────────────
 .pio/
-.vscode/
-*.bin
-*.elf
+
+# ── Device-specific runtime config ──────────────────
 data/config.json
+
+# ── Coverage reports ───────────────────────────────
+coverage/
+coverage.info
+coverage_filtered.info
+*.gcda
+*.gcno
+
+# ── IDE / Editor ───────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db

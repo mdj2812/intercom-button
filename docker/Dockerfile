@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl wget ca-certificates \
     udev usbutils build-essential \
     cppcheck \
+    lcov \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Node.js 20.x (required by Gitea Actions runner) ─
