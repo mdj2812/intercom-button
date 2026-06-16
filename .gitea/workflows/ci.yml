@@ -12,6 +12,7 @@ on:
       - '.clang-format'
       - 'docker/Dockerfile'
       - 'docker/.docker-image'
+      - 'docker/dev.sh'
       - '.gitea/workflows/ci.yml'
   pull_request:
     branches: [main]
@@ -30,31 +31,18 @@ jobs:
     runs-on: check
     steps:
       - uses: actions/checkout@v4
-      - name: Load Docker image
-        run: echo "CI_IMAGE=$(cat docker/.docker-image)" >> $GITHUB_ENV
       - name: Build firmware
-        run: |
-          docker run --rm --network host \
-            -v $PWD:/workspace \
-            $CI_IMAGE pio run -e esp32-s3-devkitc-1
+        run: ./docker/dev.sh pio run -e esp32-s3-devkitc-1
       - name: Show binary size
-        run: |
-          docker run --rm --network host \
-            -v $PWD:/workspace \
-            $CI_IMAGE pio run -e esp32-s3-devkitc-1 -t size
+        run: ./docker/dev.sh pio run -e esp32-s3-devkitc-1 -t size
 
   # ── Static Analysis ────────────────────────────────
   check:
     runs-on: check
     steps:
       - uses: actions/checkout@v4
-      - name: Load Docker image
-        run: echo "CI_IMAGE=$(cat docker/.docker-image)" >> $GITHUB_ENV
       - name: PlatformIO check (cppcheck)
-        run: |
-          docker run --rm --network host \
-            -v $PWD:/workspace \
-            $CI_IMAGE pio check -e esp32-s3-devkitc-1 --fail-on-defect=high --skip-packages 2>&1 || true
+        run: ./docker/dev.sh pio check -e esp32-s3-devkitc-1 --fail-on-defect=high --skip-packages 2>&1 || true
 
   # ── Code Format ────────────────────────────────────
   format:
@@ -69,26 +57,16 @@ jobs:
     runs-on: check
     steps:
       - uses: actions/checkout@v4
-      - name: Load Docker image
-        run: echo "CI_IMAGE=$(cat docker/.docker-image)" >> $GITHUB_ENV
       - name: Run unit tests
-        run: |
-          docker run --rm --network host \
-            -v $PWD:/workspace \
-            $CI_IMAGE pio test -e native -v
+        run: ./docker/dev.sh pio test -e native -v
 
   # ── Code Coverage (native tests) ───────────────────
   coverage:
     runs-on: check
     steps:
       - uses: actions/checkout@v4
-      - name: Load Docker image
-        run: echo "CI_IMAGE=$(cat docker/.docker-image)" >> $GITHUB_ENV
       - name: Build & run tests with coverage
-        run: |
-          docker run --rm --network host \
-            -v $PWD:/workspace \
-            $CI_IMAGE make test-coverage
+        run: ./docker/dev.sh make test-coverage
       - name: Upload coverage HTML
         uses: actions/upload-artifact@v3
         with:
