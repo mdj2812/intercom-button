@@ -35,6 +35,13 @@ public:
         return *this;
     }
 
-    // Allows implicit conversion to std::string for testing convenience
-    operator std::string() const { return _s; }
+    bool concat(const char* s) {
+        if (!s) return false;
+        _s += s;
+        return true;
+    }
+    bool concat(const String& s) {
+        _s += s._s;
+        return true;
+    }
 };
