@@ -21,3 +21,6 @@ coverage_filtered.info
 # ── OS ─────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# ── Hermes plan files ──────────────────────────────
+.hermes/
