@@ -35,6 +35,11 @@ inline void mock_wifi_set_connected(bool connected, int rssi = -50) {
     _wifi_mock.rssi = connected ? rssi : 0;
 }
 
+/// Set a specific WiFi status code (for testing non-connected states).
+inline void mock_wifi_set_status(int status) {
+    _wifi_mock.status = status;
+}
+
 // ── WiFi class ──────────────────────────────────────
 class WiFiClass {
 public:

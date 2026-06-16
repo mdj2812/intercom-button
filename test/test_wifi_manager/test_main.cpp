@@ -70,16 +70,16 @@ void test_status_str_returns_correct_strings() {
     TEST_ASSERT_EQUAL_STRING("disconnected", WiFiManager::status_str());
 
     // Test other status codes directly via the mock state
-    _wifi_mock.status = WL_NO_SSID_AVAIL;
+    mock_wifi_set_status(WL_NO_SSID_AVAIL);
     TEST_ASSERT_EQUAL_STRING("no_ssid", WiFiManager::status_str());
 
-    _wifi_mock.status = WL_CONNECT_FAILED;
+    mock_wifi_set_status(WL_CONNECT_FAILED);
     TEST_ASSERT_EQUAL_STRING("connect_failed", WiFiManager::status_str());
 
-    _wifi_mock.status = WL_IDLE_STATUS;
+    mock_wifi_set_status(WL_IDLE_STATUS);
     TEST_ASSERT_EQUAL_STRING("idle", WiFiManager::status_str());
 
-    _wifi_mock.status = 99; // unknown code
+    mock_wifi_set_status(99); // unknown code
     TEST_ASSERT_EQUAL_STRING("unknown", WiFiManager::status_str());
 }
 
