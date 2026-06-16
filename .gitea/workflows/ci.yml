@@ -4,19 +4,24 @@ on:
   push:
     branches: [main]
     paths:
+      - 'Makefile'
       - 'src/**'
       - 'test/**'
       - 'platformio.ini'
+      - 'extra_script.py'
       - '.clang-format'
       - 'docker/Dockerfile'
       - 'docker/.docker-image'
+      - 'docker/dev.sh'
       - '.gitea/workflows/ci.yml'
   pull_request:
     branches: [main]
     paths:
+      - 'Makefile'
       - 'src/**'
       - 'test/**'
       - 'platformio.ini'
+      - 'extra_script.py'
       - '.clang-format'
       - '.gitea/workflows/ci.yml'
 
@@ -24,24 +29,20 @@ jobs:
   # ── Firmware Build ────────────────────────────────
   build:
     runs-on: check
-    container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.6
     steps:
       - uses: actions/checkout@v4
       - name: Build firmware
-        run: pio run -e esp32-s3-devkitc-1
+        run: ./docker/dev.sh pio run -e esp32-s3-devkitc-1
       - name: Show binary size
-        run: pio run -e esp32-s3-devkitc-1 -t size
+        run: ./docker/dev.sh pio run -e esp32-s3-devkitc-1 -t size
 
   # ── Static Analysis ────────────────────────────────
   check:
     runs-on: check
-    container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.6
     steps:
       - uses: actions/checkout@v4
       - name: PlatformIO check (cppcheck)
-        run: pio check -e esp32-s3-devkitc-1 --fail-on-defect=high --skip-packages 2>&1 || true
+        run: ./docker/dev.sh pio check -e esp32-s3-devkitc-1 --fail-on-defect=high --skip-packages 2>&1 || true
 
   # ── Code Format ────────────────────────────────────
   format:
@@ -54,9 +55,21 @@ jobs:
   # ── Unit Tests (native, no hardware needed) ────────
   test:
     runs-on: check
-    container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.6
     steps:
       - uses: actions/checkout@v4
       - name: Run unit tests
-        run: pio test -e native -v
+        run: ./docker/dev.sh pio test -e native -v
+
+  # ── Code Coverage (native tests) ───────────────────
+  coverage:
+    runs-on: check
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build & run tests with coverage
+        run: ./docker/dev.sh make test-coverage
+      - name: Upload coverage HTML
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
