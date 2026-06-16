@@ -28,24 +28,33 @@ jobs:
   # ── Firmware Build ────────────────────────────────
   build:
     runs-on: check
-    container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.7
     steps:
       - uses: actions/checkout@v4
+      - name: Load Docker image
+        run: echo "CI_IMAGE=$(cat docker/.docker-image)" >> $GITHUB_ENV
       - name: Build firmware
-        run: pio run -e esp32-s3-devkitc-1
+        run: |
+          docker run --rm --network host \
+            -v $PWD:/workspace \
+            $CI_IMAGE pio run -e esp32-s3-devkitc-1
       - name: Show binary size
-        run: pio run -e esp32-s3-devkitc-1 -t size
+        run: |
+          docker run --rm --network host \
+            -v $PWD:/workspace \
+            $CI_IMAGE pio run -e esp32-s3-devkitc-1 -t size
 
   # ── Static Analysis ────────────────────────────────
   check:
     runs-on: check
-    container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.7
     steps:
       - uses: actions/checkout@v4
+      - name: Load Docker image
+        run: echo "CI_IMAGE=$(cat docker/.docker-image)" >> $GITHUB_ENV
       - name: PlatformIO check (cppcheck)
-        run: pio check -e esp32-s3-devkitc-1 --fail-on-defect=high --skip-packages 2>&1 || true
+        run: |
+          docker run --rm --network host \
+            -v $PWD:/workspace \
+            $CI_IMAGE pio check -e esp32-s3-devkitc-1 --fail-on-defect=high --skip-packages 2>&1 || true
 
   # ── Code Format ────────────────────────────────────
   format:
@@ -58,22 +67,28 @@ jobs:
   # ── Unit Tests (native, no hardware needed) ────────
   test:
     runs-on: check
-    container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.7
     steps:
       - uses: actions/checkout@v4
+      - name: Load Docker image
+        run: echo "CI_IMAGE=$(cat docker/.docker-image)" >> $GITHUB_ENV
       - name: Run unit tests
-        run: pio test -e native -v
+        run: |
+          docker run --rm --network host \
+            -v $PWD:/workspace \
+            $CI_IMAGE pio test -e native -v
 
   # ── Code Coverage (native tests) ───────────────────
   coverage:
     runs-on: check
-    container:
-      image: registry.home.mdj2812.top/esp32-pio-builder:v1.0.7
     steps:
       - uses: actions/checkout@v4
+      - name: Load Docker image
+        run: echo "CI_IMAGE=$(cat docker/.docker-image)" >> $GITHUB_ENV
       - name: Build & run tests with coverage
-        run: make test-coverage
+        run: |
+          docker run --rm --network host \
+            -v $PWD:/workspace \
+            $CI_IMAGE make test-coverage
       - name: Upload coverage HTML
         uses: actions/upload-artifact@v3
         with:
