@@ -3,8 +3,8 @@
 /// Tests the actual src/wifi_manager.cpp code using the
 /// mock WiFi and Arduino headers from test/mocks/.
 
-#include <Arduino.h>
 #include "wifi_manager.h"
+#include <Arduino.h>
 #include <unity.h>
 
 void setUp() {
@@ -12,8 +12,7 @@ void setUp() {
     mock_set_millis(0);
 }
 
-void tearDown() {
-}
+void tearDown() {}
 
 // ── Test 1: begin() sets WiFi parameters ─────────────
 void test_begin_sets_wifi_params() {

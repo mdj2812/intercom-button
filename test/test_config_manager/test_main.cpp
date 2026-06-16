@@ -4,9 +4,9 @@
 /// in the JSON file. Missing file or parse errors leave previous values unchanged.
 /// This tests the ACTUAL behavior, not an idealized version.
 
+#include "config_manager.h"
 #include <Arduino.h>
 #include <LittleFS.h>
-#include "config_manager.h"
 #include <unity.h>
 
 static void inject_and_load(const char* json) {

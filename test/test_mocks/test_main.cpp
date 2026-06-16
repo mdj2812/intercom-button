@@ -28,7 +28,7 @@ void test_mock_delay() {
 void test_mock_string() {
     String s("hello");
     TEST_ASSERT_EQUAL_STRING("hello", s.c_str());
-    TEST_ASSERT_EQUAL(5, (int)s.length());
+    TEST_ASSERT_EQUAL(5, (int) s.length());
 
     String s2 = s;
     TEST_ASSERT_EQUAL_STRING("hello", s2.c_str());
