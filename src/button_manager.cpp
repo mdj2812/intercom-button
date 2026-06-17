@@ -1,6 +1,10 @@
 #include "button_manager.h"
 #include <Arduino.h>
 
+ButtonManager::~ButtonManager() {
+    delete[] _buttons;
+}
+
 void ButtonManager::begin(const uint8_t* pins, uint8_t count) {
     _count = count;
     _buttons = new Button[count];
@@ -59,11 +63,13 @@ ButtonManager::Event ButtonManager::poll() {
 }
 
 bool ButtonManager::is_held(uint8_t index) const {
-    if (index >= _count) return false;
+    if (index >= _count)
+        return false;
     return _buttons[index].held;
 }
 
 unsigned long ButtonManager::hold_duration(uint8_t index) const {
-    if (index >= _count || !_buttons[index].held) return 0;
+    if (index >= _count || !_buttons[index].held)
+        return 0;
     return millis() - _buttons[index].press_start;
 }

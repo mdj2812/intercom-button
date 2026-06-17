@@ -16,8 +16,12 @@ public:
         uint8_t button_index;
         EventType type;
 
-        bool valid() const { return type != EventType::NONE; }
+        bool valid() const {
+            return type != EventType::NONE;
+        }
     };
+
+    ~ButtonManager();
 
     /// Initialize with GPIO pin array and button count.
     /// Configures each pin as INPUT_PULLUP.
@@ -34,18 +38,20 @@ public:
     unsigned long hold_duration(uint8_t index) const;
 
     /// Number of buttons managed.
-    uint8_t count() const { return _count; }
+    uint8_t count() const {
+        return _count;
+    }
 
 private:
     struct Button {
         uint8_t gpio;
-        bool raw = true;             // last raw GPIO reading (true=HIGH)
-        bool stable = true;          // debounced stable state
-        bool dirty = false;          // raw differs from stable, debouncing
+        bool raw = true;    // last raw GPIO reading (true=HIGH)
+        bool stable = true; // debounced stable state
+        bool dirty = false; // raw differs from stable, debouncing
         unsigned long dirty_since = 0;
-        bool held = false;           // currently in active press
+        bool held = false; // currently in active press
         unsigned long press_start = 0;
-        bool long_fired = false;     // LONG_PRESS already emitted for this press
+        bool long_fired = false; // LONG_PRESS already emitted for this press
     };
 
     Button* _buttons = nullptr;

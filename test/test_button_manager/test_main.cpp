@@ -3,8 +3,8 @@
 /// Uses mock digitalRead/millis to simulate button presses without real hardware.
 
 #include "mocks/Arduino.h"
-#include <unity.h>
 #include <cstring>
+#include <unity.h>
 
 // ── Include after mocks ─────────────────────────────
 #include "../src/button_manager.h"
@@ -15,13 +15,19 @@ static ButtonManager mgr;
 static const uint8_t PINS[] = {4, 5, 12, 13};
 
 // Shorthand for setting mock pin state
-static void set_pin(uint8_t pin, uint8_t val) { digitalReadPin[pin] = val; }
-static void advance_ms(unsigned long ms) { _mock_millis += ms; }
+static void set_pin(uint8_t pin, uint8_t val) {
+    digitalReadPin[pin] = val;
+}
+static void advance_ms(unsigned long ms) {
+    _mock_millis += ms;
+}
 
 void setUp() {
     // Reset mocks
-    for (auto& v : digitalReadPin) v = HIGH;
-    for (auto& v : pinModePinParam) v = 0;
+    for (auto& v : digitalReadPin)
+        v = HIGH;
+    for (auto& v : pinModePinParam)
+        v = 0;
     _mock_millis = 0;
 
     mgr = ButtonManager();
