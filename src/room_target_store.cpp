@@ -1,6 +1,6 @@
 #include "room_target_store.h"
-#include <Preferences.h>
 #include <cstdio>
+#include <Preferences.h>
 #include <string>
 
 static const char* NVS_NS = "btn_cfg";
@@ -83,8 +83,8 @@ bool RoomTargetStore::set_room(uint8_t gpio_pin, const std::string& room) {
     std::string truncated = room;
     if (truncated.length() > MAX_ROOM_KEY_LEN) {
         truncated.resize(MAX_ROOM_KEY_LEN);
-        fprintf(stderr, "[room_store] WARNING: room name truncated to %u chars (was %u)\n",
-                       MAX_ROOM_KEY_LEN, (unsigned)room.length());
+        fprintf(stderr, "[room_store] WARNING: room name truncated to %u chars (was %u)\n", MAX_ROOM_KEY_LEN,
+                (unsigned) room.length());
     }
 
     Preferences prefs;
