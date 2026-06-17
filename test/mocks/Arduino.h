@@ -15,6 +15,7 @@
 
 #define LOW   0
 #define HIGH  1
+#define CHANGE 1     // interrupt mode
 
 // ── Test-controllable pin state ────────────────────
 // Tests set digitalReadPin[pin] to control digitalRead() return value.
@@ -33,6 +34,15 @@ inline int digitalRead(uint8_t pin) {
 inline void digitalWrite(uint8_t pin, uint8_t val) {
     (void)pin;
     (void)val;
+}
+
+// ── Interrupt stubs (no-op in native tests) ────────────
+// The real ISR path is exercised via ButtonManager::_simulate_change().
+inline void attachInterruptArg(uint8_t pin, void (*)(void*), void*, int) {
+    (void)pin;
+}
+inline void detachInterrupt(uint8_t pin) {
+    (void)pin;
 }
 
 // ── Timing — mockable via inline globals ────────────

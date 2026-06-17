@@ -1,6 +1,7 @@
 /// ButtonManager native tests — validates debounce, press/release/long-press detection.
 ///
-/// Uses mock digitalRead/millis to simulate button presses without real hardware.
+/// Uses ButtonManager::_simulate_change() to mimic GPIO ISR firing,
+/// with mock millis() to control time.
 
 #include "mocks/Arduino.h"
 #include <cstring>
@@ -14,9 +15,9 @@ using EventType = ButtonManager::EventType;
 static ButtonManager mgr;
 static const uint8_t PINS[] = {4, 5, 12, 13};
 
-// Shorthand for setting mock pin state
-static void set_pin(uint8_t pin, uint8_t val) {
-    digitalReadPin[pin] = val;
+// Shorthand: simulate a GPIO edge at the given button index
+static void sim_change(uint8_t idx, bool high) {
+    mgr._simulate_change(idx, high);
 }
 static void advance_ms(unsigned long ms) {
     _mock_millis += ms;
@@ -47,25 +48,22 @@ void test_begin_configures_input_pullup() {
     TEST_ASSERT_EQUAL(INPUT_PULLUP, pinModePinParam[13]);
 }
 
-// ── Test: debounce ──────────────────────────────────
+// ── Test: idle ──────────────────────────────────────
 
 void test_no_event_when_idle() {
-    set_pin(4, HIGH);
+    // No simulated interrupts — poll() returns NONE immediately
     auto ev = mgr.poll();
     TEST_ASSERT_FALSE(ev.valid());
 }
 
+// ── Test: debounce ──────────────────────────────────
+
 void test_press_detected_after_debounce() {
-    // Start: all HIGH
-    set_pin(4, HIGH);
-    mgr.poll();
-
-    // Button pressed (goes LOW)
-    set_pin(4, LOW);
+    // Simulate GPIO edge (HIGH → LOW)
+    sim_change(0, LOW);
     auto ev = mgr.poll();
-    TEST_ASSERT_FALSE(ev.valid()); // still debouncing
+    TEST_ASSERT_FALSE(ev.valid());   // within debounce window
 
-    // Advance past debounce period while held LOW
     advance_ms(60);
     ev = mgr.poll();
     TEST_ASSERT_TRUE(ev.valid());
@@ -74,26 +72,22 @@ void test_press_detected_after_debounce() {
 }
 
 void test_bounce_filtered() {
-    set_pin(4, HIGH);
-    mgr.poll();
-
     // Contact bounce: LOW → HIGH → LOW within debounce window
-    set_pin(4, LOW);
+    sim_change(0, LOW);
     mgr.poll();
 
     advance_ms(10);
-    set_pin(4, HIGH); // bounce back
-    mgr.poll();
+    sim_change(0, HIGH);
+    mgr.poll();                      // bounce back — resets timer
 
     advance_ms(10);
-    set_pin(4, LOW); // bounce again
-    mgr.poll();
+    sim_change(0, LOW);
+    mgr.poll();                      // bounce again
 
-    // Still no event — each bounce resets timer
     auto ev = mgr.poll();
-    TEST_ASSERT_FALSE(ev.valid());
+    TEST_ASSERT_FALSE(ev.valid());   // still debouncing
 
-    // Now hold steady LOW past debounce
+    // Hold steady past debounce
     advance_ms(60);
     ev = mgr.poll();
     TEST_ASSERT_TRUE(ev.valid());
@@ -103,16 +97,16 @@ void test_bounce_filtered() {
 // ── Test: release ───────────────────────────────────
 
 void test_release_detected_after_debounce() {
-    // Press button first
-    set_pin(4, LOW);
+    // Press first
+    sim_change(0, LOW);
     mgr.poll();
     advance_ms(60);
-    mgr.poll(); // PRESS event
+    mgr.poll();                      // PRESS
 
-    // Release button (goes HIGH)
-    set_pin(4, HIGH);
+    // Release (LOW → HIGH)
+    sim_change(0, HIGH);
     auto ev = mgr.poll();
-    TEST_ASSERT_FALSE(ev.valid()); // debouncing
+    TEST_ASSERT_FALSE(ev.valid());   // debouncing
 
     advance_ms(60);
     ev = mgr.poll();
@@ -124,15 +118,15 @@ void test_release_detected_after_debounce() {
 // ── Test: long press ────────────────────────────────
 
 void test_long_press_emitted_after_threshold() {
-    set_pin(4, LOW);
+    sim_change(0, LOW);
     mgr.poll();
     advance_ms(60);
-    mgr.poll(); // PRESS
+    mgr.poll();                      // PRESS
 
-    // Advance to just before long-press threshold
+    // Just before threshold
     advance_ms(1900);
     auto ev = mgr.poll();
-    TEST_ASSERT_FALSE(ev.valid()); // not yet
+    TEST_ASSERT_FALSE(ev.valid());
 
     // Cross threshold
     advance_ms(200);
@@ -142,17 +136,16 @@ void test_long_press_emitted_after_threshold() {
 }
 
 void test_long_press_fires_only_once() {
-    set_pin(4, LOW);
+    sim_change(0, LOW);
     mgr.poll();
     advance_ms(60);
-    mgr.poll(); // PRESS
+    mgr.poll();                      // PRESS
 
-    // First long press
     advance_ms(2100);
     auto ev = mgr.poll();
     TEST_ASSERT_EQUAL(EventType::LONG_PRESS, ev.type);
 
-    // Still held, but no more long press events
+    // Still held, no duplicate event
     advance_ms(1000);
     ev = mgr.poll();
     TEST_ASSERT_FALSE(ev.valid());
@@ -161,22 +154,23 @@ void test_long_press_fires_only_once() {
 // ── Test: is_held & hold_duration ───────────────────
 
 void test_is_held_and_duration() {
-    set_pin(4, LOW);
+    sim_change(0, LOW);
     mgr.poll();
     advance_ms(60);
-    mgr.poll(); // PRESS
+    mgr.poll();                      // PRESS
 
     TEST_ASSERT_TRUE(mgr.is_held(0));
     TEST_ASSERT_FALSE(mgr.is_held(1));
 
     advance_ms(500);
-    TEST_ASSERT_EQUAL(500, mgr.hold_duration(0)); // press_start at 60ms, now at 560ms
+    // press_start at 60ms, now at 560ms → duration 500ms
+    TEST_ASSERT_EQUAL(500, mgr.hold_duration(0));
 
     // Release
-    set_pin(4, HIGH);
+    sim_change(0, HIGH);
     mgr.poll();
     advance_ms(60);
-    mgr.poll(); // RELEASE
+    mgr.poll();                      // RELEASE
 
     TEST_ASSERT_FALSE(mgr.is_held(0));
     TEST_ASSERT_EQUAL(0, mgr.hold_duration(0));
@@ -186,15 +180,15 @@ void test_is_held_and_duration() {
 
 void test_independent_buttons() {
     // Button 0 pressed
-    set_pin(4, LOW);
+    sim_change(0, LOW);
     mgr.poll();
     advance_ms(60);
     auto ev = mgr.poll();
     TEST_ASSERT_EQUAL(EventType::PRESS, ev.type);
     TEST_ASSERT_EQUAL(0, ev.button_index);
 
-    // Button 2 pressed while button 0 still held
-    set_pin(12, LOW);
+    // Button 2 pressed while btn 0 still held
+    sim_change(2, LOW);
     advance_ms(10);
     mgr.poll();
     advance_ms(60);

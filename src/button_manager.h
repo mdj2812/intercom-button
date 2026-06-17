@@ -1,10 +1,16 @@
 #pragma once
 #include <cstdint>
 
-/// Manages N physical buttons with per-button debounce and event detection.
+// IRAM_ATTR is ESP32-specific; no-op on native
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
+
+/// Manages N physical buttons with per-button GPIO interrupt + debounce.
 ///
-/// Each button is active LOW with internal pull-up.
-/// Call poll() in loop() to get press/release/long-press events.
+/// Each button is active LOW with internal pull-up. GPIO CHANGE interrupts
+/// wake the CPU only when a button actually toggles — zero polling overhead
+/// when idle. Call poll() in loop() to consume queued events.
 class ButtonManager {
 public:
     static constexpr unsigned long DEBOUNCE_MS = 50;
@@ -24,11 +30,12 @@ public:
     ~ButtonManager();
 
     /// Initialize with GPIO pin array and button count.
-    /// Configures each pin as INPUT_PULLUP.
+    /// Configures each pin as INPUT_PULLUP and attaches CHANGE interrupt.
     void begin(const uint8_t* pins, uint8_t count);
 
-    /// Poll for the next button event. Returns Event with type=NONE if no event.
-    /// Processes all buttons each call — returns only the first event found.
+    /// Consume the next button event from the ISR queue.
+    /// Returns Event with type=NONE if no pending event.
+    /// O(1) when idle — no digitalRead() calls if no interrupt fired.
     Event poll();
 
     /// True if button is currently held down (debounced active state).
@@ -42,17 +49,27 @@ public:
         return _count;
     }
 
+    /// For testing: simulate a GPIO edge as if the ISR fired.
+    /// Sets the recorded level and marks the index as pending.
+    void _simulate_change(uint8_t index, bool level);
+
 private:
     struct Button {
         uint8_t gpio;
-        bool raw = true;    // last raw GPIO reading (true=HIGH)
-        bool stable = true; // debounced stable state
-        bool dirty = false; // raw differs from stable, debouncing
-        unsigned long dirty_since = 0;
-        bool held = false; // currently in active press
+
+        // ── ISR-updated (volatile) ─────────────
+        volatile bool    irq_pending = false;  // set by ISR, cleared by poll()
+        volatile unsigned long irq_time = 0;   // millis() captured in ISR
+        volatile bool    irq_level = true;     // digitalRead() captured in ISR (true=HIGH)
+
+        // ── State machine (poll() only) ───────
+        bool stable = true;        // debounced state (true=HIGH / not pressed)
+        bool held   = false;
         unsigned long press_start = 0;
-        bool long_fired = false; // LONG_PRESS already emitted for this press
+        bool long_fired = false;
     };
+
+    static void IRAM_ATTR _isr(void* arg);
 
     Button* _buttons = nullptr;
     uint8_t _count = 0;
