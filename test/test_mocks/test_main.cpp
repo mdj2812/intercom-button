@@ -7,8 +7,15 @@ void test_mock_arduino_compiles() {
     Serial.println("hello from mock Arduino!");
 
     pinMode(4, INPUT_PULLUP);
+    TEST_ASSERT_EQUAL(INPUT_PULLUP, pinModePinParam[4]);
+
+    digitalReadPin[4] = HIGH;
     int btn = digitalRead(4);
     TEST_ASSERT_EQUAL(HIGH, btn); // default: not pressed
+
+    digitalReadPin[4] = LOW;
+    btn = digitalRead(4);
+    TEST_ASSERT_EQUAL(LOW, btn); // pressed
 }
 
 void test_mock_millis() {

@@ -1,48 +1,76 @@
 #pragma once
-#include <cstdint>
-#include <cstddef>
-#include <cstdarg>
-#include <cstdio>
-#include "WString.h"
 #include "Print.h"
 #include "Stream.h"
+#include "WString.h"
+#include <cstdarg>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
 
 // ── Pin I/O ─────────────────────────────────────────
-#define INPUT           0x01
-#define OUTPUT          0x02
-#define INPUT_PULLUP    0x05
-#define INPUT_PULLDOWN  0x06
+#define INPUT 0x01
+#define OUTPUT 0x02
+#define INPUT_PULLUP 0x05
+#define INPUT_PULLDOWN 0x06
 
-#define LOW   0
-#define HIGH  1
+#define LOW 0
+#define HIGH 1
+#define CHANGE 1 // interrupt mode
+
+// ── Test-controllable pin state ────────────────────
+// Tests set digitalReadPin[pin] to control digitalRead() return value.
+// Tests read pinModePinParam[pin] to verify pinMode() was called.
+constexpr uint8_t MAX_MOCK_PIN = 64;
+
+inline uint8_t digitalReadPin[MAX_MOCK_PIN] = {HIGH}; // default: not pressed
+inline uint8_t pinModePinParam[MAX_MOCK_PIN] = {0};
 
 inline void pinMode(uint8_t pin, uint8_t mode) {
-    (void)pin;
-    (void)mode;
+    pinModePinParam[pin] = mode;
 }
 inline int digitalRead(uint8_t pin) {
-    (void)pin;
-    return HIGH; // default: not pressed
+    return digitalReadPin[pin];
 }
 inline void digitalWrite(uint8_t pin, uint8_t val) {
-    (void)pin;
-    (void)val;
+    (void) pin;
+    (void) val;
+}
+
+// ── Interrupt stubs (no-op in native tests) ────────────
+// The real ISR path is exercised via ButtonManager::_simulate_change().
+inline void attachInterruptArg(uint8_t pin, void (*)(void*), void*, int) {
+    (void) pin;
+}
+inline void detachInterrupt(uint8_t pin) {
+    (void) pin;
 }
 
 // ── Timing — mockable via inline globals ────────────
 inline unsigned long _mock_millis = 0;
 
-inline unsigned long millis() { return _mock_millis; }
-inline unsigned long micros() { return _mock_millis * 1000; }
-inline void delay(unsigned long ms) { _mock_millis += ms; }
+inline unsigned long millis() {
+    return _mock_millis;
+}
+inline unsigned long micros() {
+    return _mock_millis * 1000;
+}
+inline void delay(unsigned long ms) {
+    _mock_millis += ms;
+}
 
-inline void mock_set_millis(unsigned long ms) { _mock_millis = ms; }
-inline void mock_advance_millis(unsigned long ms) { _mock_millis += ms; }
+inline void mock_set_millis(unsigned long ms) {
+    _mock_millis = ms;
+}
+inline void mock_advance_millis(unsigned long ms) {
+    _mock_millis += ms;
+}
 
 // ── Serial mock ─────────────────────────────────────
 class SerialMock : public Stream {
 public:
-    void begin(unsigned long baud) { (void)baud; }
+    void begin(unsigned long baud) {
+        (void) baud;
+    }
     using Print::printf;
 };
 inline SerialMock Serial;
