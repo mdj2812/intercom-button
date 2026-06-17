@@ -19,7 +19,7 @@ public:
 
     /// Look up the room target for a given GPIO pin.
     /// Priority: NVS → config-file defaults → hardcoded defaults.
-    const char* get_room(uint8_t gpio_pin) const;
+    std::string get_room(uint8_t gpio_pin) const;
 
     /// Store a room mapping in NVS. Takes effect immediately.
     bool set_room(uint8_t gpio_pin, const char* room);
@@ -38,7 +38,7 @@ public:
     uint8_t defaults_count() const;
 
 private:
-    static const char* _hardcoded_room(uint8_t gpio_pin);
+    static std::string _hardcoded_room(uint8_t gpio_pin);
 
     struct DefaultEntry {
         uint8_t gpio;

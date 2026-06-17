@@ -83,7 +83,7 @@ void setup() {
     }
 
     for (uint8_t i = 0; i < active_pin_count; i++) {
-        Serial.printf("[main] GPIO%u → %s\n", active_pins[i], room_store.get_room(active_pins[i]));
+        Serial.printf("[main] GPIO%u → %s\n", active_pins[i], room_store.get_room(active_pins[i]).c_str());
     }
 
     // ── Button manager ──────────────────────────────
@@ -167,13 +167,13 @@ void loop() {
             led_blink(255, 255, 255, 100);
 
             uint8_t gpio = active_pins[active_button_index];
-            const char* room = room_store.get_room(gpio);
+            std::string room = room_store.get_room(gpio);
 
             bool ok = HTTPUploader::upload(recorder.data(), recorder.total_bytes(), ConfigManager::server_host(),
-                                           ConfigManager::server_port(), room);
+                                           ConfigManager::server_port(), room.c_str());
 
             unsigned long upload_ms = millis() - upload_start_ms;
-            Serial.printf("[main] Upload to %s %s (%lu ms)\n", room, ok ? "OK" : "FAILED", upload_ms);
+            Serial.printf("[main] Upload to %s %s (%lu ms)\n", room.c_str(), ok ? "OK" : "FAILED", upload_ms);
 
             for (int i = 0; i < 4; i++) {
                 led_set(ok ? 0 : 255, ok ? 255 : 0, 0);

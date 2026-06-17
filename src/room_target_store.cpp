@@ -4,7 +4,6 @@
 #include <string>
 
 static const char* NVS_NS = "btn_cfg";
-static std::string _room_cache; // cached result — valid until next get_room() call
 
 // ── Hardcoded ultimate fallback ─────────────────────
 // These are used only when neither NVS nor config-file defaults match.
@@ -21,10 +20,10 @@ static const struct {
 
 static constexpr size_t HARDCODED_COUNT = sizeof(HARDCODED) / sizeof(HARDCODED[0]);
 
-const char* RoomTargetStore::_hardcoded_room(uint8_t gpio_pin) {
+std::string RoomTargetStore::_hardcoded_room(uint8_t gpio_pin) {
     for (size_t i = 0; i < HARDCODED_COUNT; i++) {
         if (HARDCODED[i].gpio == gpio_pin)
-            return HARDCODED[i].room;
+            return std::string(HARDCODED[i].room);
     }
     return "study";
 }
@@ -56,7 +55,7 @@ bool RoomTargetStore::begin() {
     return true;
 }
 
-const char* RoomTargetStore::get_room(uint8_t gpio_pin) const {
+std::string RoomTargetStore::get_room(uint8_t gpio_pin) const {
     // Tier 1 — NVS (runtime override)
     Preferences prefs;
     if (prefs.begin(NVS_NS, true)) {
@@ -67,15 +66,14 @@ const char* RoomTargetStore::get_room(uint8_t gpio_pin) const {
         prefs.end();
 
         if (room.length() > 0) {
-            _room_cache = room.c_str();
-            return _room_cache.c_str();
+            return std::string(room.c_str());
         }
     }
 
     // Tier 2 — Config-file defaults
     for (const auto& d : _defaults) {
         if (d.gpio == gpio_pin)
-            return d.room.c_str();
+            return d.room;
     }
 
     // Tier 3 — Hardcoded fallback
