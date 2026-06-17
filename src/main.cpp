@@ -29,6 +29,9 @@ static RoomTargetStore room_store;
 static AudioRecorder recorder;
 static Adafruit_NeoPixel led(1, PIN_LED_WS2812, NEO_GRB + NEO_KHZ800);
 
+static const uint8_t* active_pins = BUTTON_PINS;
+static uint8_t active_pin_count = BUTTON_COUNT;
+
 enum class State { IDLE, RECORDING, UPLOADING };
 static State state = State::IDLE;
 static unsigned long record_start_ms = 0;
@@ -73,13 +76,18 @@ void setup() {
         Serial.println("[main] NVS init failed — using defaults");
     }
     ConfigManager::load_button_defaults(room_store);
-    for (uint8_t i = 0; i < ConfigManager::button_pin_count(); i++) {
-        uint8_t pin = ConfigManager::button_pins()[i];
-        Serial.printf("[main] GPIO%u → %s\n", pin, room_store.get_room(pin));
+
+    if (ConfigManager::button_pin_count() > 0) {
+        active_pins = ConfigManager::button_pins();
+        active_pin_count = ConfigManager::button_pin_count();
+    }
+
+    for (uint8_t i = 0; i < active_pin_count; i++) {
+        Serial.printf("[main] GPIO%u → %s\n", active_pins[i], room_store.get_room(active_pins[i]));
     }
 
     // ── Button manager ──────────────────────────────
-    buttons.begin(ConfigManager::button_pins(), ConfigManager::button_pin_count());
+    buttons.begin(active_pins, active_pin_count);
 
     // ── WiFi ────────────────────────────────────────
     WiFiManager::begin(ConfigManager::wifi_ssid(), ConfigManager::wifi_password());
@@ -121,7 +129,7 @@ void loop() {
                 record_start_ms = millis();
                 led_set(0, 0, 255);
                 state = State::RECORDING;
-                Serial.printf("[main] Recording for GPIO%u...\n", ConfigManager::button_pins()[active_button_index]);
+                Serial.printf("[main] Recording for GPIO%u...\n", active_pins[active_button_index]);
             }
             break;
         }
@@ -158,7 +166,7 @@ void loop() {
         case State::UPLOADING: {
             led_blink(255, 255, 255, 100);
 
-            uint8_t gpio = ConfigManager::button_pins()[active_button_index];
+            uint8_t gpio = active_pins[active_button_index];
             const char* room = room_store.get_room(gpio);
 
             bool ok = HTTPUploader::upload(recorder.data(), recorder.total_bytes(), ConfigManager::server_host(),

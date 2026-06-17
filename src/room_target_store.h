@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <string>
 #include <vector>
 
 /// Per-GPIO-pin → room key mapping.
@@ -42,7 +43,7 @@ private:
 
     struct DefaultEntry {
         uint8_t gpio;
-        char room[32];
+        std::string room;
     };
 
     std::vector<DefaultEntry> _defaults;

@@ -1,6 +1,6 @@
 #include "room_target_store.h"
+#include <cstdio>
 #include <Preferences.h>
-#include <cstring>
 
 static const char* NVS_NS = "btn_cfg";
 static char _room_buf[32]; // cached result — valid until next get_room() call
@@ -33,11 +33,7 @@ const char* RoomTargetStore::_hardcoded_room(uint8_t gpio_pin) {
 void RoomTargetStore::set_default_room(uint8_t gpio, const char* room) {
     if (_defaults.size() >= MAX_DEFAULTS)
         return;
-    DefaultEntry entry;
-    entry.gpio = gpio;
-    strncpy(entry.room, room, sizeof(entry.room) - 1);
-    entry.room[sizeof(entry.room) - 1] = '\0';
-    _defaults.push_back(entry);
+    _defaults.push_back({gpio, std::string(room)});
 }
 
 void RoomTargetStore::clear_defaults() {
@@ -79,7 +75,7 @@ const char* RoomTargetStore::get_room(uint8_t gpio_pin) const {
     // Tier 2 — Config-file defaults
     for (const auto& d : _defaults) {
         if (d.gpio == gpio_pin)
-            return d.room;
+            return d.room.c_str();
     }
 
     // Tier 3 — Hardcoded fallback

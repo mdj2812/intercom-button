@@ -5,6 +5,8 @@
 #include <LittleFS.h>
 
 static const char* TAG = "cfg";
+// JSON document size for config.json with up to 8 buttons.
+// Base fields (~200B) + 8× "pins" ints (~48B) + 8× "buttons" entries (~240B) + overhead.
 static constexpr size_t JSON_DOC_SIZE = 768;
 
 // ── Default values (used when config.json is missing) ─
@@ -19,13 +21,13 @@ struct Config {
 
     // Per-button room mappings from config.json "buttons" field
     static constexpr uint8_t MAX_BUTTONS = 8;
-    uint8_t button_pins[MAX_BUTTONS] = {4, 5, 12, 13}; // default pins
+    uint8_t button_pins[MAX_BUTTONS] = {};
     String button_rooms[MAX_BUTTONS];
-    uint8_t button_count = 4; // default: 4 buttons
+    uint8_t button_count = 0;
 
     // Config-file pin list from "pins" field
-    uint8_t pins[MAX_BUTTONS] = {4, 5, 12, 13};
-    uint8_t pin_count = 4;
+    uint8_t pins[MAX_BUTTONS] = {};
+    uint8_t pin_count = 0;
 };
 static Config cfg;
 
@@ -91,7 +93,12 @@ bool ConfigManager::begin() {
         }
     }
 
-    Serial.printf("[%s] Loaded: room=%s server=%s:%u wifi=%s buttons=%u\n", TAG, cfg.room.c_str(),
+    // ── Validate: warn if pins/buttons sizes mismatch ─
+    if (cfg.pin_count > 0 && cfg.button_count > 0 && cfg.pin_count != cfg.button_count) {
+        Serial.printf("[%s] WARNING: pins count (%u) != buttons count (%u)\n", TAG, cfg.pin_count, cfg.button_count);
+    }
+
+    Serial.printf("[%s] Loaded: room=%s server=%s:%u wifi=%s buttons=%u pins=%u\n", TAG, cfg.room.c_str(),
                   cfg.server_host.c_str(), cfg.server_port, cfg.wifi_ssid.c_str(), cfg.button_count);
     return true;
 }
