@@ -151,10 +151,10 @@ void ConfigManager::load_button_defaults(RoomTargetStore& store) {
 
 // ── Pin accessors ───────────────────────────────────
 
-const uint8_t* ConfigManager::button_pins() {
+const uint8_t* ConfigManager::active_pins() {
     return cfg.pins;
 }
 
-uint8_t ConfigManager::button_pin_count() {
+uint8_t ConfigManager::active_pin_count() {
     return cfg.pin_count;
 }

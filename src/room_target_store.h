@@ -14,7 +14,8 @@
 /// Key format: `btn_<gpio>` → room key string (e.g. "study", "living").
 class RoomTargetStore {
 public:
-    /// Open NVS namespace. Must be called once in setup().
+    /// Validate NVS accessibility. Opens and closes the namespace immediately
+    /// — a one-shot health check, not a persistent handle. Call once in setup().
     bool begin();
 
     /// Look up the room target for a given GPIO pin.

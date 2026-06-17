@@ -77,9 +77,9 @@ void setup() {
     }
     ConfigManager::load_button_defaults(room_store);
 
-    if (ConfigManager::button_pin_count() > 0) {
-        active_pins = ConfigManager::button_pins();
-        active_pin_count = ConfigManager::button_pin_count();
+    if (ConfigManager::active_pin_count() > 0) {
+        active_pins = ConfigManager::active_pins();
+        active_pin_count = ConfigManager::active_pin_count();
     }
 
     for (uint8_t i = 0; i < active_pin_count; i++) {

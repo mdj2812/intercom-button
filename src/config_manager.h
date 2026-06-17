@@ -26,9 +26,10 @@ uint32_t max_record_secs();
 /// Call after begin() and room_store.begin().
 void load_button_defaults(RoomTargetStore& store);
 
-/// Button GPIO pins from config.json "pins" array.
+/// Active GPIO pins from config.json "pins" array (decides which GPIOs to initialize).
+/// Distinct from the "buttons" mapping — pins = which GPIOs, buttons = what room per GPIO.
 /// Falls back to compiled-in defaults if not configured.
-const uint8_t* button_pins();
-uint8_t button_pin_count();
+const uint8_t* active_pins();
+uint8_t active_pin_count();
 
 } // namespace ConfigManager
