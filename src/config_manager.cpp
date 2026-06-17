@@ -1,4 +1,5 @@
 #include "config_manager.h"
+#include "room_target_store.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
@@ -14,6 +15,12 @@ struct Config {
     String room = "study";
     uint32_t sample_rate = 16000;
     uint32_t max_secs = 60;
+
+    // Per-button room mappings from config.json "buttons" field
+    static constexpr uint8_t MAX_BUTTONS = 8;
+    uint8_t button_pins[MAX_BUTTONS] = {};
+    String button_rooms[MAX_BUTTONS];
+    uint8_t button_count = 0;
 };
 static Config cfg;
 
@@ -30,7 +37,7 @@ bool ConfigManager::begin() {
         return false;
     }
 
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<768> doc;
     DeserializationError err = deserializeJson(doc, f);
     f.close();
 
@@ -55,8 +62,21 @@ bool ConfigManager::begin() {
     if (doc.containsKey("max_record_secs"))
         cfg.max_secs = doc["max_record_secs"].as<uint32_t>();
 
-    Serial.printf("[%s] Loaded: room=%s server=%s:%u wifi=%s\n", TAG, cfg.room.c_str(), cfg.server_host.c_str(),
-                  cfg.server_port, cfg.wifi_ssid.c_str());
+    // ── Parse per-button room mappings ────────────
+    if (doc.containsKey("buttons")) {
+        JsonObject buttons = doc["buttons"].as<JsonObject>();
+        cfg.button_count = 0;
+        for (JsonPair kv : buttons) {
+            if (cfg.button_count >= Config::MAX_BUTTONS)
+                break;
+            cfg.button_pins[cfg.button_count] = atoi(kv.key().c_str());
+            cfg.button_rooms[cfg.button_count] = kv.value().as<String>();
+            cfg.button_count++;
+        }
+    }
+
+    Serial.printf("[%s] Loaded: room=%s server=%s:%u wifi=%s buttons=%u\n", TAG, cfg.room.c_str(),
+                  cfg.server_host.c_str(), cfg.server_port, cfg.wifi_ssid.c_str(), cfg.button_count);
     return true;
 }
 
@@ -82,4 +102,13 @@ uint32_t ConfigManager::sample_rate() {
 }
 uint32_t ConfigManager::max_record_secs() {
     return cfg.max_secs;
+}
+
+// ── Button defaults ────────────────────────────────
+
+void ConfigManager::load_button_defaults(RoomTargetStore& store) {
+    store.clear_defaults();
+    for (uint8_t i = 0; i < cfg.button_count; i++) {
+        store.set_default_room(cfg.button_pins[i], cfg.button_rooms[i].c_str());
+    }
 }

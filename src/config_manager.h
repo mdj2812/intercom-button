@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+class RoomTargetStore;
+
 /// Runtime configuration loaded from LittleFS /config.json.
 /// Call ConfigManager::begin() once in setup(), then use the accessors.
 namespace ConfigManager {
@@ -19,5 +21,9 @@ const char* room_target();
 // Audio settings (read-only after boot)
 uint32_t sample_rate();
 uint32_t max_record_secs();
+
+/// Populate RoomTargetStore config-file defaults from config.json "buttons" field.
+/// Call after begin() and room_store.begin().
+void load_button_defaults(RoomTargetStore& store);
 
 } // namespace ConfigManager

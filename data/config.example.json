@@ -5,5 +5,11 @@
     "server_port": 8764,
     "room": "study",
     "sample_rate": 16000,
-    "max_record_secs": 60
+    "max_record_secs": 60,
+    "buttons": {
+        "4": "study",
+        "5": "living",
+        "12": "cinema",
+        "13": "bedroom"
+    }
 }

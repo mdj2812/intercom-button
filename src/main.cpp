@@ -68,10 +68,11 @@ void setup() {
     Serial.printf("Server: %s:%u | Max: %us\n", ConfigManager::server_host(), ConfigManager::server_port(),
                   ConfigManager::max_record_secs());
 
-    // ── Per-button room mapping (NVS) ───────────────
+    // ── Per-button room mapping (NVS + config.json) ─
     if (!room_store.begin()) {
         Serial.println("[main] NVS init failed — using defaults");
     }
+    ConfigManager::load_button_defaults(room_store);
     for (uint8_t i = 0; i < BUTTON_COUNT; i++) {
         Serial.printf("[main] GPIO%u → %s\n", BUTTON_PINS[i], room_store.get_room(BUTTON_PINS[i]));
     }

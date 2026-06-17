@@ -68,6 +68,39 @@ void test_multiple_pins_independent() {
     TEST_ASSERT_EQUAL_STRING("cinema", store.get_room(12));
 }
 
+// ── Config-file defaults (Tier 2) ─────────────────
+
+void test_config_default_overrides_hardcoded() {
+    store.set_default_room(4, "garage");
+    TEST_ASSERT_EQUAL_STRING("garage", store.get_room(4));
+    // Unchanged pins still use hardcoded
+    TEST_ASSERT_EQUAL_STRING("living", store.get_room(5));
+}
+
+void test_nvs_wins_over_config_default() {
+    store.set_default_room(4, "garage");
+    store.set_room(4, "kitchen");
+    // NVS (Tier 1) beats config-file (Tier 2)
+    TEST_ASSERT_EQUAL_STRING("kitchen", store.get_room(4));
+}
+
+void test_reset_falls_back_to_config_default() {
+    store.set_default_room(4, "garage");
+    store.set_room(4, "kitchen");
+    store.reset();
+    // After NVS clear, falls back to config-file default
+    TEST_ASSERT_EQUAL_STRING("garage", store.get_room(4));
+}
+
+void test_clear_defaults() {
+    store.set_default_room(4, "garage");
+    TEST_ASSERT_EQUAL(1, store.defaults_count());
+    store.clear_defaults();
+    TEST_ASSERT_EQUAL(0, store.defaults_count());
+    // After clear, falls back to hardcoded
+    TEST_ASSERT_EQUAL_STRING("study", store.get_room(4));
+}
+
 int main() {
     UNITY_BEGIN();
 
@@ -81,6 +114,11 @@ int main() {
     RUN_TEST(test_overwrite_room);
     RUN_TEST(test_reset_clears_all);
     RUN_TEST(test_multiple_pins_independent);
+
+    RUN_TEST(test_config_default_overrides_hardcoded);
+    RUN_TEST(test_nvs_wins_over_config_default);
+    RUN_TEST(test_reset_falls_back_to_config_default);
+    RUN_TEST(test_clear_defaults);
 
     return UNITY_END();
 }
