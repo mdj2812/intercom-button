@@ -29,6 +29,11 @@ public:
 
     ~ButtonManager();
 
+    // ── No copy / move ────────────────────────────
+    ButtonManager() = default;
+    ButtonManager(const ButtonManager&) = delete;
+    ButtonManager& operator=(const ButtonManager&) = delete;
+
     /// Initialize with GPIO pin array and button count.
     /// Configures each pin as INPUT_PULLUP and attaches CHANGE interrupt.
     void begin(const uint8_t* pins, uint8_t count);
@@ -49,9 +54,11 @@ public:
         return _count;
     }
 
+#ifdef UNIT_TEST
     /// For testing: simulate a GPIO edge as if the ISR fired.
     /// Sets the recorded level and marks the index as pending.
     void _simulate_change(uint8_t index, bool level);
+#endif
 
 private:
     struct Button {

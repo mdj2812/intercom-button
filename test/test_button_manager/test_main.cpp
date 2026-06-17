@@ -4,7 +4,7 @@
 /// with mock millis() to control time.
 
 #include "mocks/Arduino.h"
-#include <cstring>
+#include <new>
 #include <unity.h>
 
 // ── Include after mocks ─────────────────────────────
@@ -31,7 +31,9 @@ void setUp() {
         v = 0;
     _mock_millis = 0;
 
-    mgr = ButtonManager();
+    // Placement-new avoids copy-assignment (which is now deleted)
+    mgr.~ButtonManager();
+    new (&mgr) ButtonManager();
     mgr.begin(PINS, 4);
 }
 

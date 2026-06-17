@@ -20,6 +20,13 @@ ButtonManager::~ButtonManager() {
 }
 
 void ButtonManager::begin(const uint8_t* pins, uint8_t count) {
+    // Guard against re-initialization (leaks old allocation + orphaned ISRs)
+    if (_buttons != nullptr) {
+        for (uint8_t i = 0; i < _count; i++)
+            detachInterrupt(_buttons[i].gpio);
+        delete[] _buttons;
+    }
+
     _count = count;
     _buttons = new Button[count];
 
@@ -41,7 +48,9 @@ ButtonManager::Event ButtonManager::poll() {
         if (!b.irq_pending)
             continue;
 
-        // Snapshot volatile data (flag NOT cleared yet)
+        // Snapshot volatile data (flag NOT cleared yet).
+        // NB: ISR may fire between snapshot and clear, losing the latest
+        // edge for this cycle. Acceptable for button signals (<100 Hz).
         bool level = b.irq_level;
         unsigned long irq_t = b.irq_time;
 
@@ -78,7 +87,7 @@ ButtonManager::Event ButtonManager::poll() {
         }
     }
 
-    return {0, EventType::NONE};
+    return {0, EventType::NONE}; // sentinel: button_index ignored when type=NONE
 }
 
 // ── Query ─────────────────────────────────────────────
@@ -95,6 +104,7 @@ unsigned long ButtonManager::hold_duration(uint8_t index) const {
     return millis() - _buttons[index].press_start;
 }
 
+#ifdef UNIT_TEST
 // ── Testing helper ────────────────────────────────────
 
 void ButtonManager::_simulate_change(uint8_t index, bool level) {
@@ -104,3 +114,4 @@ void ButtonManager::_simulate_change(uint8_t index, bool level) {
     _buttons[index].irq_time = millis();
     _buttons[index].irq_pending = true;
 }
+#endif
