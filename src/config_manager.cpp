@@ -8,15 +8,15 @@
 static const char* TAG = "cfg";
 
 // JSON key constants
-static constexpr const char* KEY_WIFI_SSID       = "wifi_ssid";
-static constexpr const char* KEY_WIFI_PASSWORD   = "wifi_password";
-static constexpr const char* KEY_SERVER_HOST     = "server_host";
-static constexpr const char* KEY_SERVER_PORT     = "server_port";
-static constexpr const char* KEY_ROOM            = "room";
-static constexpr const char* KEY_SAMPLE_RATE     = "sample_rate";
+static constexpr const char* KEY_WIFI_SSID = "wifi_ssid";
+static constexpr const char* KEY_WIFI_PASSWORD = "wifi_password";
+static constexpr const char* KEY_SERVER_HOST = "server_host";
+static constexpr const char* KEY_SERVER_PORT = "server_port";
+static constexpr const char* KEY_ROOM = "room";
+static constexpr const char* KEY_SAMPLE_RATE = "sample_rate";
 static constexpr const char* KEY_MAX_RECORD_SECS = "max_record_secs";
-static constexpr const char* KEY_PINS            = "pins";
-static constexpr const char* KEY_BUTTONS         = "buttons";
+static constexpr const char* KEY_PINS = "pins";
+static constexpr const char* KEY_BUTTONS = "buttons";
 
 // JSON document size: base fields + MAX_BUTTONS × (pins entry + buttons entry + overhead)
 static constexpr size_t JSON_BASE = 256;   // wifi, server, room, audio fields
