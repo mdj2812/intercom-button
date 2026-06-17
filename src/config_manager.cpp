@@ -6,6 +6,18 @@
 #include <LittleFS.h>
 
 static const char* TAG = "cfg";
+
+// JSON key constants
+static constexpr const char* KEY_WIFI_SSID       = "wifi_ssid";
+static constexpr const char* KEY_WIFI_PASSWORD   = "wifi_password";
+static constexpr const char* KEY_SERVER_HOST     = "server_host";
+static constexpr const char* KEY_SERVER_PORT     = "server_port";
+static constexpr const char* KEY_ROOM            = "room";
+static constexpr const char* KEY_SAMPLE_RATE     = "sample_rate";
+static constexpr const char* KEY_MAX_RECORD_SECS = "max_record_secs";
+static constexpr const char* KEY_PINS            = "pins";
+static constexpr const char* KEY_BUTTONS         = "buttons";
+
 // JSON document size: base fields + MAX_BUTTONS × (pins entry + buttons entry + overhead)
 static constexpr size_t JSON_BASE = 256;   // wifi, server, room, audio fields
 static constexpr size_t JSON_PER_BTN = 50; // one "pins" int + one "buttons" KV pair + overhead
@@ -55,24 +67,24 @@ bool ConfigManager::begin() {
     }
 
     // ── Read fields (keep defaults for missing keys) ──
-    if (doc.containsKey("wifi_ssid"))
-        cfg.wifi_ssid = doc["wifi_ssid"].as<String>();
-    if (doc.containsKey("wifi_password"))
-        cfg.wifi_password = doc["wifi_password"].as<String>();
-    if (doc.containsKey("server_host"))
-        cfg.server_host = doc["server_host"].as<String>();
-    if (doc.containsKey("server_port"))
-        cfg.server_port = doc["server_port"].as<uint16_t>();
-    if (doc.containsKey("room"))
-        cfg.room = doc["room"].as<String>();
-    if (doc.containsKey("sample_rate"))
-        cfg.sample_rate = doc["sample_rate"].as<uint32_t>();
-    if (doc.containsKey("max_record_secs"))
-        cfg.max_secs = doc["max_record_secs"].as<uint32_t>();
+    if (doc.containsKey(KEY_WIFI_SSID))
+        cfg.wifi_ssid = doc[KEY_WIFI_SSID].as<String>();
+    if (doc.containsKey(KEY_WIFI_PASSWORD))
+        cfg.wifi_password = doc[KEY_WIFI_PASSWORD].as<String>();
+    if (doc.containsKey(KEY_SERVER_HOST))
+        cfg.server_host = doc[KEY_SERVER_HOST].as<String>();
+    if (doc.containsKey(KEY_SERVER_PORT))
+        cfg.server_port = doc[KEY_SERVER_PORT].as<uint16_t>();
+    if (doc.containsKey(KEY_ROOM))
+        cfg.room = doc[KEY_ROOM].as<String>();
+    if (doc.containsKey(KEY_SAMPLE_RATE))
+        cfg.sample_rate = doc[KEY_SAMPLE_RATE].as<uint32_t>();
+    if (doc.containsKey(KEY_MAX_RECORD_SECS))
+        cfg.max_secs = doc[KEY_MAX_RECORD_SECS].as<uint32_t>();
 
     // ── Parse button pin list ──────────────────────
-    if (doc.containsKey("pins")) {
-        JsonArray pinsArr = doc["pins"].as<JsonArray>();
+    if (doc.containsKey(KEY_PINS)) {
+        JsonArray pinsArr = doc[KEY_PINS].as<JsonArray>();
         cfg.pin_count = 0;
         for (JsonVariant v : pinsArr) {
             if (cfg.pin_count >= MAX_BUTTONS)
@@ -82,8 +94,8 @@ bool ConfigManager::begin() {
     }
 
     // ── Parse per-button room mappings ────────────
-    if (doc.containsKey("buttons")) {
-        JsonObject buttons = doc["buttons"].as<JsonObject>();
+    if (doc.containsKey(KEY_BUTTONS)) {
+        JsonObject buttons = doc[KEY_BUTTONS].as<JsonObject>();
         cfg.button_count = 0;
         for (JsonPair kv : buttons) {
             if (cfg.button_count >= MAX_BUTTONS)
