@@ -1,9 +1,10 @@
 #include "room_target_store.h"
 #include <cstdio>
 #include <Preferences.h>
+#include <string>
 
 static const char* NVS_NS = "btn_cfg";
-static char _room_buf[32]; // cached result — valid until next get_room() call
+static std::string _room_cache; // cached result — valid until next get_room() call
 
 // ── Hardcoded ultimate fallback ─────────────────────
 // These are used only when neither NVS nor config-file defaults match.
@@ -66,9 +67,8 @@ const char* RoomTargetStore::get_room(uint8_t gpio_pin) const {
         prefs.end();
 
         if (room.length() > 0) {
-            strncpy(_room_buf, room.c_str(), sizeof(_room_buf) - 1);
-            _room_buf[sizeof(_room_buf) - 1] = '\0';
-            return _room_buf;
+            _room_cache = room.c_str();
+            return _room_cache.c_str();
         }
     }
 
