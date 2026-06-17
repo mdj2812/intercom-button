@@ -16,19 +16,18 @@ ButtonManager::~ButtonManager() {
     for (uint8_t i = 0; i < _count; i++) {
         detachInterrupt(_buttons[i].gpio);
     }
-    delete[] _buttons;
+    // unique_ptr handles delete[]
 }
 
 void ButtonManager::begin(const uint8_t* pins, uint8_t count) {
-    // Guard against re-initialization (leaks old allocation + orphaned ISRs)
-    if (_buttons != nullptr) {
+    // Detach old ISRs if re-initializing
+    if (_buttons) {
         for (uint8_t i = 0; i < _count; i++)
             detachInterrupt(_buttons[i].gpio);
-        delete[] _buttons;
     }
 
     _count = count;
-    _buttons = new Button[count];
+    _buttons.reset(new Button[count]);
 
     for (uint8_t i = 0; i < count; i++) {
         _buttons[i].gpio = pins[i];

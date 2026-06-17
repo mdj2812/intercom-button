@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <memory>
 
 // IRAM_ATTR is ESP32-specific; no-op on native
 #ifndef IRAM_ATTR
@@ -78,6 +79,6 @@ private:
 
     static void IRAM_ATTR _isr(void* arg);
 
-    Button* _buttons = nullptr;
+    std::unique_ptr<Button[]> _buttons;
     uint8_t _count = 0;
 };
