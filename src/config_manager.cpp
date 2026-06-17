@@ -1,13 +1,15 @@
 #include "config_manager.h"
+#include "consts.hpp"
 #include "room_target_store.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 
 static const char* TAG = "cfg";
-// JSON document size for config.json with up to 8 buttons.
-// Base fields (~200B) + 8× "pins" ints (~48B) + 8× "buttons" entries (~240B) + overhead.
-static constexpr size_t JSON_DOC_SIZE = 768;
+// JSON document size: base fields + MAX_BUTTONS × (pins entry + buttons entry + overhead)
+static constexpr size_t JSON_BASE = 256;   // wifi, server, room, audio fields
+static constexpr size_t JSON_PER_BTN = 50; // one "pins" int + one "buttons" KV pair + overhead
+static constexpr size_t JSON_DOC_SIZE = JSON_BASE + MAX_BUTTONS * JSON_PER_BTN; // 656 for 8 buttons
 
 // ── Default values (used when config.json is missing) ─
 struct Config {
@@ -20,7 +22,6 @@ struct Config {
     uint32_t max_secs = 60;
 
     // Per-button room mappings from config.json "buttons" field
-    static constexpr uint8_t MAX_BUTTONS = 8;
     uint8_t button_pins[MAX_BUTTONS] = {};
     String button_rooms[MAX_BUTTONS];
     uint8_t button_count = 0;
@@ -74,7 +75,7 @@ bool ConfigManager::begin() {
         JsonArray pinsArr = doc["pins"].as<JsonArray>();
         cfg.pin_count = 0;
         for (JsonVariant v : pinsArr) {
-            if (cfg.pin_count >= Config::MAX_BUTTONS)
+            if (cfg.pin_count >= MAX_BUTTONS)
                 break;
             cfg.pins[cfg.pin_count++] = v.as<uint8_t>();
         }
@@ -85,7 +86,7 @@ bool ConfigManager::begin() {
         JsonObject buttons = doc["buttons"].as<JsonObject>();
         cfg.button_count = 0;
         for (JsonPair kv : buttons) {
-            if (cfg.button_count >= Config::MAX_BUTTONS)
+            if (cfg.button_count >= MAX_BUTTONS)
                 break;
             cfg.button_pins[cfg.button_count] = atoi(kv.key().c_str());
             cfg.button_rooms[cfg.button_count] = kv.value().as<String>();

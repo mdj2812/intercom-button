@@ -31,7 +31,7 @@ const char* RoomTargetStore::_hardcoded_room(uint8_t gpio_pin) {
 // ── Config-file defaults ────────────────────────────
 
 void RoomTargetStore::set_default_room(uint8_t gpio, const char* room) {
-    if (_defaults.size() >= MAX_DEFAULTS)
+    if (_defaults.size() >= MAX_BUTTONS)
         return;
     _defaults.push_back({gpio, std::string(room)});
 }

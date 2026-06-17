@@ -119,11 +119,11 @@ void loop() {
                 led_set(0, 255, 0);
             }
 
-            // PTT uses LONG_PRESS (hold 2s) to avoid accidental triggers.
+            // PTT triggers on PRESS (immediate) for responsive UX.
             // Single-threaded loop(): no race on active_button_index —
             // ButtonManager::poll() runs synchronously, ISR only touches
             // volatile flags inside ButtonManager.
-            if (event.type == ButtonManager::EventType::LONG_PRESS && wifi_ok) {
+            if (event.type == ButtonManager::EventType::PRESS && wifi_ok) {
                 active_button_index = event.button_index;
                 recorder.start();
                 record_start_ms = millis();

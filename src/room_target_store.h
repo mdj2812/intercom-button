@@ -1,4 +1,5 @@
 #pragma once
+#include "consts.hpp"
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -13,8 +14,6 @@
 /// Key format: `btn_<gpio>` → room key string (e.g. "study", "living").
 class RoomTargetStore {
 public:
-    static constexpr uint8_t MAX_DEFAULTS = 8;
-
     /// Open NVS namespace. Must be called once in setup().
     bool begin();
 
