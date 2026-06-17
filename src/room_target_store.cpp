@@ -31,20 +31,21 @@ const char* RoomTargetStore::_hardcoded_room(uint8_t gpio_pin) {
 // ── Config-file defaults ────────────────────────────
 
 void RoomTargetStore::set_default_room(uint8_t gpio, const char* room) {
-    if (_defaults_count >= MAX_DEFAULTS)
+    if (_defaults.size() >= MAX_DEFAULTS)
         return;
-    _defaults[_defaults_count].gpio = gpio;
-    strncpy(_defaults[_defaults_count].room, room, sizeof(_defaults[0].room) - 1);
-    _defaults[_defaults_count].room[sizeof(_defaults[0].room) - 1] = '\0';
-    _defaults_count++;
+    DefaultEntry entry;
+    entry.gpio = gpio;
+    strncpy(entry.room, room, sizeof(entry.room) - 1);
+    entry.room[sizeof(entry.room) - 1] = '\0';
+    _defaults.push_back(entry);
 }
 
 void RoomTargetStore::clear_defaults() {
-    _defaults_count = 0;
+    _defaults.clear();
 }
 
 uint8_t RoomTargetStore::defaults_count() const {
-    return _defaults_count;
+    return static_cast<uint8_t>(_defaults.size());
 }
 
 // ── NVS operations ──────────────────────────────────
@@ -76,9 +77,9 @@ const char* RoomTargetStore::get_room(uint8_t gpio_pin) const {
     }
 
     // Tier 2 — Config-file defaults
-    for (uint8_t i = 0; i < _defaults_count; i++) {
-        if (_defaults[i].gpio == gpio_pin)
-            return _defaults[i].room;
+    for (const auto& d : _defaults) {
+        if (d.gpio == gpio_pin)
+            return d.room;
     }
 
     // Tier 3 — Hardcoded fallback

@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <vector>
 
 /// Per-GPIO-pin → room key mapping.
 ///
@@ -11,6 +12,8 @@
 /// Key format: `btn_<gpio>` → room key string (e.g. "study", "living").
 class RoomTargetStore {
 public:
+    static constexpr uint8_t MAX_DEFAULTS = 8;
+
     /// Open NVS namespace. Must be called once in setup().
     bool begin();
 
@@ -25,7 +28,7 @@ public:
     void reset();
 
     /// Set a config-file-level default (typically from config.json "buttons" field).
-    /// These sit between NVS and hardcoded defaults in the priority chain.
+    /// Enforces MAX_DEFAULTS limit. These sit between NVS and hardcoded defaults.
     void set_default_room(uint8_t gpio, const char* room);
 
     /// Clear all config-file defaults (e.g. before reloading).
@@ -42,7 +45,5 @@ private:
         char room[32];
     };
 
-    static constexpr uint8_t MAX_DEFAULTS = 8;
-    DefaultEntry _defaults[MAX_DEFAULTS];
-    uint8_t _defaults_count = 0;
+    std::vector<DefaultEntry> _defaults;
 };

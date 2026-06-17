@@ -5,6 +5,7 @@
 #include <LittleFS.h>
 
 static const char* TAG = "cfg";
+static constexpr size_t JSON_DOC_SIZE = 768;
 
 // ── Default values (used when config.json is missing) ─
 struct Config {
@@ -18,9 +19,13 @@ struct Config {
 
     // Per-button room mappings from config.json "buttons" field
     static constexpr uint8_t MAX_BUTTONS = 8;
-    uint8_t button_pins[MAX_BUTTONS] = {};
+    uint8_t button_pins[MAX_BUTTONS] = {4, 5, 12, 13}; // default pins
     String button_rooms[MAX_BUTTONS];
-    uint8_t button_count = 0;
+    uint8_t button_count = 4; // default: 4 buttons
+
+    // Config-file pin list from "pins" field
+    uint8_t pins[MAX_BUTTONS] = {4, 5, 12, 13};
+    uint8_t pin_count = 4;
 };
 static Config cfg;
 
@@ -37,7 +42,7 @@ bool ConfigManager::begin() {
         return false;
     }
 
-    StaticJsonDocument<768> doc;
+    StaticJsonDocument<JSON_DOC_SIZE> doc;
     DeserializationError err = deserializeJson(doc, f);
     f.close();
 
@@ -61,6 +66,17 @@ bool ConfigManager::begin() {
         cfg.sample_rate = doc["sample_rate"].as<uint32_t>();
     if (doc.containsKey("max_record_secs"))
         cfg.max_secs = doc["max_record_secs"].as<uint32_t>();
+
+    // ── Parse button pin list ──────────────────────
+    if (doc.containsKey("pins")) {
+        JsonArray pinsArr = doc["pins"].as<JsonArray>();
+        cfg.pin_count = 0;
+        for (JsonVariant v : pinsArr) {
+            if (cfg.pin_count >= Config::MAX_BUTTONS)
+                break;
+            cfg.pins[cfg.pin_count++] = v.as<uint8_t>();
+        }
+    }
 
     // ── Parse per-button room mappings ────────────
     if (doc.containsKey("buttons")) {
@@ -111,4 +127,14 @@ void ConfigManager::load_button_defaults(RoomTargetStore& store) {
     for (uint8_t i = 0; i < cfg.button_count; i++) {
         store.set_default_room(cfg.button_pins[i], cfg.button_rooms[i].c_str());
     }
+}
+
+// ── Pin accessors ───────────────────────────────────
+
+const uint8_t* ConfigManager::button_pins() {
+    return cfg.pins;
+}
+
+uint8_t ConfigManager::button_pin_count() {
+    return cfg.pin_count;
 }

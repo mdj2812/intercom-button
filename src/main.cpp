@@ -73,12 +73,13 @@ void setup() {
         Serial.println("[main] NVS init failed — using defaults");
     }
     ConfigManager::load_button_defaults(room_store);
-    for (uint8_t i = 0; i < BUTTON_COUNT; i++) {
-        Serial.printf("[main] GPIO%u → %s\n", BUTTON_PINS[i], room_store.get_room(BUTTON_PINS[i]));
+    for (uint8_t i = 0; i < ConfigManager::button_pin_count(); i++) {
+        uint8_t pin = ConfigManager::button_pins()[i];
+        Serial.printf("[main] GPIO%u → %s\n", pin, room_store.get_room(pin));
     }
 
     // ── Button manager ──────────────────────────────
-    buttons.begin(BUTTON_PINS, BUTTON_COUNT);
+    buttons.begin(ConfigManager::button_pins(), ConfigManager::button_pin_count());
 
     // ── WiFi ────────────────────────────────────────
     WiFiManager::begin(ConfigManager::wifi_ssid(), ConfigManager::wifi_password());
@@ -110,13 +111,17 @@ void loop() {
                 led_set(0, 255, 0);
             }
 
-            if (event.type == ButtonManager::EventType::PRESS && wifi_ok) {
+            // PTT uses LONG_PRESS (hold 2s) to avoid accidental triggers.
+            // Single-threaded loop(): no race on active_button_index —
+            // ButtonManager::poll() runs synchronously, ISR only touches
+            // volatile flags inside ButtonManager.
+            if (event.type == ButtonManager::EventType::LONG_PRESS && wifi_ok) {
                 active_button_index = event.button_index;
                 recorder.start();
                 record_start_ms = millis();
                 led_set(0, 0, 255);
                 state = State::RECORDING;
-                Serial.printf("[main] Recording for GPIO%u...\n", BUTTON_PINS[active_button_index]);
+                Serial.printf("[main] Recording for GPIO%u...\n", ConfigManager::button_pins()[active_button_index]);
             }
             break;
         }
@@ -153,7 +158,7 @@ void loop() {
         case State::UPLOADING: {
             led_blink(255, 255, 255, 100);
 
-            uint8_t gpio = BUTTON_PINS[active_button_index];
+            uint8_t gpio = ConfigManager::button_pins()[active_button_index];
             const char* room = room_store.get_room(gpio);
 
             bool ok = HTTPUploader::upload(recorder.data(), recorder.total_bytes(), ConfigManager::server_host(),
