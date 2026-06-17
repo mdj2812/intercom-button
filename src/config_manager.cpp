@@ -133,7 +133,7 @@ uint32_t ConfigManager::max_record_secs() {
 void ConfigManager::load_button_defaults(RoomTargetStore& store) {
     store.clear_defaults();
     for (uint8_t i = 0; i < cfg.button_count; i++) {
-        store.set_default_room(cfg.button_pins[i], cfg.button_rooms[i].c_str());
+        store.set_default_room(cfg.button_pins[i], std::string(cfg.button_rooms[i].c_str()));
     }
 }
 

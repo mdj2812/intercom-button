@@ -22,14 +22,14 @@ public:
     std::string get_room(uint8_t gpio_pin) const;
 
     /// Store a room mapping in NVS. Takes effect immediately.
-    bool set_room(uint8_t gpio_pin, const char* room);
+    bool set_room(uint8_t gpio_pin, const std::string& room);
 
     /// Erase all per-button room mappings from NVS (reset to defaults).
     void reset();
 
     /// Set a config-file-level default (typically from config.json "buttons" field).
     /// Enforces MAX_DEFAULTS limit. These sit between NVS and hardcoded defaults.
-    void set_default_room(uint8_t gpio, const char* room);
+    void set_default_room(uint8_t gpio, const std::string& room);
 
     /// Clear all config-file defaults (e.g. before reloading).
     void clear_defaults();

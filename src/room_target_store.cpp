@@ -1,5 +1,4 @@
 #include "room_target_store.h"
-#include <cstdio>
 #include <Preferences.h>
 #include <string>
 
@@ -30,10 +29,10 @@ std::string RoomTargetStore::_hardcoded_room(uint8_t gpio_pin) {
 
 // ── Config-file defaults ────────────────────────────
 
-void RoomTargetStore::set_default_room(uint8_t gpio, const char* room) {
+void RoomTargetStore::set_default_room(uint8_t gpio, const std::string& room) {
     if (_defaults.size() >= MAX_BUTTONS)
         return;
-    _defaults.push_back({gpio, std::string(room)});
+    _defaults.push_back({gpio, room});
 }
 
 void RoomTargetStore::clear_defaults() {
@@ -59,10 +58,9 @@ std::string RoomTargetStore::get_room(uint8_t gpio_pin) const {
     // Tier 1 — NVS (runtime override)
     Preferences prefs;
     if (prefs.begin(NVS_NS, true)) {
-        char key[16];
-        snprintf(key, sizeof(key), "btn_%u", gpio_pin);
+        std::string key = "btn_" + std::to_string(gpio_pin);
 
-        String room = prefs.getString(key, "");
+        String room = prefs.getString(key.c_str(), "");
         prefs.end();
 
         if (room.length() > 0) {
@@ -80,16 +78,14 @@ std::string RoomTargetStore::get_room(uint8_t gpio_pin) const {
     return _hardcoded_room(gpio_pin);
 }
 
-bool RoomTargetStore::set_room(uint8_t gpio_pin, const char* room) {
+bool RoomTargetStore::set_room(uint8_t gpio_pin, const std::string& room) {
     Preferences prefs;
     if (!prefs.begin(NVS_NS, false)) {
         return false;
     }
 
-    char key[16];
-    snprintf(key, sizeof(key), "btn_%u", gpio_pin);
-
-    size_t written = prefs.putString(key, room);
+    std::string key = "btn_" + std::to_string(gpio_pin);
+    size_t written = prefs.putString(key.c_str(), room.c_str());
     prefs.end();
     return written > 0;
 }
