@@ -58,13 +58,13 @@ private:
         uint8_t gpio;
 
         // ── ISR-updated (volatile) ─────────────
-        volatile bool    irq_pending = false;  // set by ISR, cleared by poll()
-        volatile unsigned long irq_time = 0;   // millis() captured in ISR
-        volatile bool    irq_level = true;     // digitalRead() captured in ISR (true=HIGH)
+        volatile bool irq_pending = false;   // set by ISR, cleared by poll()
+        volatile unsigned long irq_time = 0; // millis() captured in ISR
+        volatile bool irq_level = true;      // digitalRead() captured in ISR (true=HIGH)
 
         // ── State machine (poll() only) ───────
-        bool stable = true;        // debounced state (true=HIGH / not pressed)
-        bool held   = false;
+        bool stable = true; // debounced state (true=HIGH / not pressed)
+        bool held = false;
         unsigned long press_start = 0;
         bool long_fired = false;
     };

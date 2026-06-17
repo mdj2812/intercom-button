@@ -6,7 +6,7 @@
 void IRAM_ATTR ButtonManager::_isr(void* arg) {
     auto* b = static_cast<Button*>(arg);
     b->irq_level = digitalRead(b->gpio);
-    b->irq_time  = millis();
+    b->irq_time = millis();
     b->irq_pending = true;
 }
 
@@ -20,7 +20,7 @@ ButtonManager::~ButtonManager() {
 }
 
 void ButtonManager::begin(const uint8_t* pins, uint8_t count) {
-    _count   = count;
+    _count = count;
     _buttons = new Button[count];
 
     for (uint8_t i = 0; i < count; i++) {
@@ -42,27 +42,27 @@ ButtonManager::Event ButtonManager::poll() {
             continue;
 
         // Snapshot volatile data (flag NOT cleared yet)
-        bool         level  = b.irq_level;
+        bool level = b.irq_level;
         unsigned long irq_t = b.irq_time;
 
         if (now - irq_t < DEBOUNCE_MS)
-            continue;            // still within debounce window
+            continue; // still within debounce window
 
         // Debounce passed — clear flag now, then process
-        b.irq_pending = false;   // allow ISR to re-trigger for this button
+        b.irq_pending = false; // allow ISR to re-trigger for this button
 
         if (level != b.stable) {
             b.stable = level;
 
             if (!level) {
                 // HIGH → LOW  =  PRESS
-                b.held        = true;
+                b.held = true;
                 b.press_start = now;
-                b.long_fired  = false;
+                b.long_fired = false;
                 return {i, EventType::PRESS};
             } else {
                 // LOW → HIGH  =  RELEASE
-                b.held       = false;
+                b.held = false;
                 b.long_fired = false;
                 return {i, EventType::RELEASE};
             }
@@ -100,7 +100,7 @@ unsigned long ButtonManager::hold_duration(uint8_t index) const {
 void ButtonManager::_simulate_change(uint8_t index, bool level) {
     if (index >= _count)
         return;
-    _buttons[index].irq_level  = level;
-    _buttons[index].irq_time   = millis();
+    _buttons[index].irq_level = level;
+    _buttons[index].irq_time = millis();
     _buttons[index].irq_pending = true;
 }

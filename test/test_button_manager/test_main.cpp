@@ -62,7 +62,7 @@ void test_press_detected_after_debounce() {
     // Simulate GPIO edge (HIGH → LOW)
     sim_change(0, LOW);
     auto ev = mgr.poll();
-    TEST_ASSERT_FALSE(ev.valid());   // within debounce window
+    TEST_ASSERT_FALSE(ev.valid()); // within debounce window
 
     advance_ms(60);
     ev = mgr.poll();
@@ -78,14 +78,14 @@ void test_bounce_filtered() {
 
     advance_ms(10);
     sim_change(0, HIGH);
-    mgr.poll();                      // bounce back — resets timer
+    mgr.poll(); // bounce back — resets timer
 
     advance_ms(10);
     sim_change(0, LOW);
-    mgr.poll();                      // bounce again
+    mgr.poll(); // bounce again
 
     auto ev = mgr.poll();
-    TEST_ASSERT_FALSE(ev.valid());   // still debouncing
+    TEST_ASSERT_FALSE(ev.valid()); // still debouncing
 
     // Hold steady past debounce
     advance_ms(60);
@@ -101,12 +101,12 @@ void test_release_detected_after_debounce() {
     sim_change(0, LOW);
     mgr.poll();
     advance_ms(60);
-    mgr.poll();                      // PRESS
+    mgr.poll(); // PRESS
 
     // Release (LOW → HIGH)
     sim_change(0, HIGH);
     auto ev = mgr.poll();
-    TEST_ASSERT_FALSE(ev.valid());   // debouncing
+    TEST_ASSERT_FALSE(ev.valid()); // debouncing
 
     advance_ms(60);
     ev = mgr.poll();
@@ -121,7 +121,7 @@ void test_long_press_emitted_after_threshold() {
     sim_change(0, LOW);
     mgr.poll();
     advance_ms(60);
-    mgr.poll();                      // PRESS
+    mgr.poll(); // PRESS
 
     // Just before threshold
     advance_ms(1900);
@@ -139,7 +139,7 @@ void test_long_press_fires_only_once() {
     sim_change(0, LOW);
     mgr.poll();
     advance_ms(60);
-    mgr.poll();                      // PRESS
+    mgr.poll(); // PRESS
 
     advance_ms(2100);
     auto ev = mgr.poll();
@@ -157,7 +157,7 @@ void test_is_held_and_duration() {
     sim_change(0, LOW);
     mgr.poll();
     advance_ms(60);
-    mgr.poll();                      // PRESS
+    mgr.poll(); // PRESS
 
     TEST_ASSERT_TRUE(mgr.is_held(0));
     TEST_ASSERT_FALSE(mgr.is_held(1));
@@ -170,7 +170,7 @@ void test_is_held_and_duration() {
     sim_change(0, HIGH);
     mgr.poll();
     advance_ms(60);
-    mgr.poll();                      // RELEASE
+    mgr.poll(); // RELEASE
 
     TEST_ASSERT_FALSE(mgr.is_held(0));
     TEST_ASSERT_EQUAL(0, mgr.hold_duration(0));
