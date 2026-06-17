@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-#include <memory>
+#include <vector>
 
 // IRAM_ATTR is ESP32-specific; no-op on native
 #ifndef IRAM_ATTR
@@ -52,7 +52,7 @@ public:
 
     /// Number of buttons managed.
     uint8_t count() const {
-        return _count;
+        return static_cast<uint8_t>(_buttons.size());
     }
 
 #ifdef UNIT_TEST
@@ -79,6 +79,5 @@ private:
 
     static void IRAM_ATTR _isr(void* arg);
 
-    std::unique_ptr<Button[]> _buttons;
-    uint8_t _count = 0;
+    std::vector<Button> _buttons;
 };

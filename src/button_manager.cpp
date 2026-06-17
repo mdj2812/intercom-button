@@ -13,21 +13,19 @@ void IRAM_ATTR ButtonManager::_isr(void* arg) {
 // ── Lifecycle ─────────────────────────────────────────
 
 ButtonManager::~ButtonManager() {
-    for (uint8_t i = 0; i < _count; i++) {
+    for (uint8_t i = 0; i < _buttons.size(); i++) {
         detachInterrupt(_buttons[i].gpio);
     }
-    // unique_ptr handles delete[]
 }
 
 void ButtonManager::begin(const uint8_t* pins, uint8_t count) {
     // Detach old ISRs if re-initializing
-    if (_buttons) {
-        for (uint8_t i = 0; i < _count; i++)
+    if (!_buttons.empty()) {
+        for (uint8_t i = 0; i < _buttons.size(); i++)
             detachInterrupt(_buttons[i].gpio);
     }
 
-    _count = count;
-    _buttons.reset(new Button[count]);
+    _buttons.resize(count);
 
     for (uint8_t i = 0; i < count; i++) {
         _buttons[i].gpio = pins[i];
@@ -42,7 +40,7 @@ ButtonManager::Event ButtonManager::poll() {
     const unsigned long now = millis();
 
     // Phase 1 — process interrupt-driven level changes
-    for (uint8_t i = 0; i < _count; i++) {
+    for (uint8_t i = 0; i < _buttons.size(); i++) {
         auto& b = _buttons[i];
         if (!b.irq_pending)
             continue;
@@ -78,7 +76,7 @@ ButtonManager::Event ButtonManager::poll() {
     }
 
     // Phase 2 — long press (timer-based, no edge needed)
-    for (uint8_t i = 0; i < _count; i++) {
+    for (uint8_t i = 0; i < _buttons.size(); i++) {
         auto& b = _buttons[i];
         if (b.held && !b.long_fired && (now - b.press_start >= LONG_PRESS_MS)) {
             b.long_fired = true;
@@ -92,13 +90,13 @@ ButtonManager::Event ButtonManager::poll() {
 // ── Query ─────────────────────────────────────────────
 
 bool ButtonManager::is_held(uint8_t index) const {
-    if (index >= _count)
+    if (index >= _buttons.size())
         return false;
     return _buttons[index].held;
 }
 
 unsigned long ButtonManager::hold_duration(uint8_t index) const {
-    if (index >= _count || !_buttons[index].held)
+    if (index >= _buttons.size() || !_buttons[index].held)
         return 0;
     return millis() - _buttons[index].press_start;
 }
@@ -107,7 +105,7 @@ unsigned long ButtonManager::hold_duration(uint8_t index) const {
 // ── Testing helper ────────────────────────────────────
 
 void ButtonManager::_simulate_change(uint8_t index, bool level) {
-    if (index >= _count)
+    if (index >= _buttons.size())
         return;
     _buttons[index].irq_level = level;
     _buttons[index].irq_time = millis();
