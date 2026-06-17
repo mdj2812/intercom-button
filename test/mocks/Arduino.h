@@ -16,13 +16,19 @@
 #define LOW   0
 #define HIGH  1
 
+// ── Test-controllable pin state ────────────────────
+// Tests set digitalReadPin[pin] to control digitalRead() return value.
+// Tests read pinModePinParam[pin] to verify pinMode() was called.
+constexpr uint8_t MAX_MOCK_PIN = 64;
+
+inline uint8_t digitalReadPin[MAX_MOCK_PIN] = {HIGH};  // default: not pressed
+inline uint8_t pinModePinParam[MAX_MOCK_PIN] = {0};
+
 inline void pinMode(uint8_t pin, uint8_t mode) {
-    (void)pin;
-    (void)mode;
+    pinModePinParam[pin] = mode;
 }
 inline int digitalRead(uint8_t pin) {
-    (void)pin;
-    return HIGH; // default: not pressed
+    return digitalReadPin[pin];
 }
 inline void digitalWrite(uint8_t pin, uint8_t val) {
     (void)pin;
