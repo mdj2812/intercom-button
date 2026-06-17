@@ -1,27 +1,31 @@
 /**
- * ESP32-S3 Desktop Intercom Button
+ * ESP32-S3 Desktop Intercom Button — Multi-Button Edition
  *
- * Push-to-talk button that records audio via MAX9814 electret mic,
- * sends WAV to Flask intercom server, which broadcasts to Home Assistant speakers.
+ * Push-to-talk buttons that record audio via MAX9814 electret mic,
+ * send WAV to Flask intercom server, which broadcasts to Home Assistant speakers.
  *
+ * Each button is mapped to a target room via NVS (RoomTargetStore).
  * Configuration is loaded from LittleFS /config.json at boot.
- * Same firmware binary is used for all rooms — just change config.json per device.
  *
  * Hardware:
  *   - ESP32-S3-DevKitC
  *   - MAX9814 mic module (VCC→3.3V, GND→GND, OUT→GPIO1)
- *   - Push button (GPIO4→GND, active low, internal pull-up)
+ *   - Push buttons (GPIO {4,5,12,13}→GND, active low, internal pull-up)
  */
 
 #include "audio_recorder.h"
-#include "config.h" // pin defines only
+#include "button_manager.h"
+#include "config.h"
 #include "config_manager.h"
 #include "http_uploader.h"
+#include "room_target_store.h"
 #include "wifi_manager.h"
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
 
 // ── Globals ─────────────────────────────────────────
+static ButtonManager buttons;
+static RoomTargetStore room_store;
 static AudioRecorder recorder;
 static Adafruit_NeoPixel led(1, PIN_LED_WS2812, NEO_GRB + NEO_KHZ800);
 
@@ -31,7 +35,7 @@ static unsigned long record_start_ms = 0;
 static const unsigned long MIN_RECORD_MS = 500;
 static unsigned long MAX_RECORD_MS = 60000; // updated from config
 
-static bool last_button = HIGH;
+static uint8_t active_button_index = 0; // which button triggered recording
 static unsigned long upload_start_ms = 0;
 
 // ── LED helpers ─────────────────────────────────────
@@ -46,29 +50,34 @@ static void led_blink(uint8_t r, uint8_t g, uint8_t b, unsigned long period_ms) 
     led_set(on ? r : 0, on ? g : 0, on ? b : 0);
 }
 
-static bool button_pressed() {
-    return digitalRead(PIN_BUTTON) == LOW;
-}
-
 // ── SETUP ───────────────────────────────────────────
 
 void setup() {
     Serial.begin(115200);
     delay(500);
-    Serial.println("\n\n=== ESP32-S3 Intercom Button ===");
+    Serial.println("\n\n=== ESP32-S3 Intercom Button (Multi) ===");
 
     led.begin();
     led_set(0, 0, 0);
     led.setBrightness(32);
 
-    pinMode(PIN_BUTTON, INPUT_PULLUP);
-
     // ── Load runtime config from LittleFS ───────────
     ConfigManager::begin();
     MAX_RECORD_MS = ConfigManager::max_record_secs() * 1000UL;
 
-    Serial.printf("Room: %s | Server: %s:%u | Max: %us\n", ConfigManager::room_target(), ConfigManager::server_host(),
-                  ConfigManager::server_port(), ConfigManager::max_record_secs());
+    Serial.printf("Server: %s:%u | Max: %us\n", ConfigManager::server_host(), ConfigManager::server_port(),
+                  ConfigManager::max_record_secs());
+
+    // ── Per-button room mapping (NVS) ───────────────
+    if (!room_store.begin()) {
+        Serial.println("[main] NVS init failed — using defaults");
+    }
+    for (uint8_t i = 0; i < BUTTON_COUNT; i++) {
+        Serial.printf("[main] GPIO%u → %s\n", BUTTON_PINS[i], room_store.get_room(BUTTON_PINS[i]));
+    }
+
+    // ── Button manager ──────────────────────────────
+    buttons.begin(BUTTON_PINS, BUTTON_COUNT);
 
     // ── WiFi ────────────────────────────────────────
     WiFiManager::begin(ConfigManager::wifi_ssid(), ConfigManager::wifi_password());
@@ -89,7 +98,7 @@ void setup() {
 
 void loop() {
     bool wifi_ok = WiFiManager::update();
-    bool btn = button_pressed();
+    auto event = buttons.poll();
 
     switch (state) {
 
@@ -100,12 +109,13 @@ void loop() {
                 led_set(0, 255, 0);
             }
 
-            if (btn && !last_button && wifi_ok) {
+            if (event.type == ButtonManager::EventType::PRESS && wifi_ok) {
+                active_button_index = event.button_index;
                 recorder.start();
                 record_start_ms = millis();
                 led_set(0, 0, 255);
                 state = State::RECORDING;
-                Serial.println("[main] Recording...");
+                Serial.printf("[main] Recording for GPIO%u...\n", BUTTON_PINS[active_button_index]);
             }
             break;
         }
@@ -119,7 +129,7 @@ void loop() {
                 goto stop_and_upload;
             }
 
-            if (!btn && last_button) {
+            if (event.type == ButtonManager::EventType::RELEASE && event.button_index == active_button_index) {
                 Serial.printf("[main] Released after %lu ms\n", elapsed);
             stop_and_upload:
                 recorder.stop();
@@ -142,11 +152,14 @@ void loop() {
         case State::UPLOADING: {
             led_blink(255, 255, 255, 100);
 
+            uint8_t gpio = BUTTON_PINS[active_button_index];
+            const char* room = room_store.get_room(gpio);
+
             bool ok = HTTPUploader::upload(recorder.data(), recorder.total_bytes(), ConfigManager::server_host(),
-                                           ConfigManager::server_port(), ConfigManager::room_target());
+                                           ConfigManager::server_port(), room);
 
             unsigned long upload_ms = millis() - upload_start_ms;
-            Serial.printf("[main] Upload %s (%lu ms)\n", ok ? "OK" : "FAILED", upload_ms);
+            Serial.printf("[main] Upload to %s %s (%lu ms)\n", room, ok ? "OK" : "FAILED", upload_ms);
 
             for (int i = 0; i < 4; i++) {
                 led_set(ok ? 0 : 255, ok ? 255 : 0, 0);
@@ -161,6 +174,5 @@ void loop() {
 
     } // switch
 
-    last_button = btn;
     delay(10);
 }

@@ -4,6 +4,10 @@
 #define PIN_LED_WS2812 48
 #define PIN_ADC_CHANNEL ADC_CHANNEL_0 // GPIO1
 
+// ──── Multi-button pins ────────────────────────────
+constexpr uint8_t BUTTON_PINS[] = {4, 5, 12, 13};
+constexpr uint8_t BUTTON_COUNT = sizeof(BUTTON_PINS) / sizeof(BUTTON_PINS[0]);
+
 // ──── MAX9814 gain (set via module solder pads) ────────
 // GAIN = GND  → 50dB (recommended)
 // GAIN = VCC  → 40dB
