@@ -143,6 +143,15 @@ void loop() {
                 goto stop_and_upload;
             }
 
+            // Ignore presses on other buttons while recording
+            if (event.type == ButtonManager::EventType::PRESS && event.button_index != active_button_index) {
+                Serial.printf("[main] Busy — recording GPIO%u, ignoring GPIO%u\n", active_pins[active_button_index],
+                              active_pins[event.button_index]);
+                led_set(255, 0, 0);
+                delay(150);
+                break;
+            }
+
             if (event.type == ButtonManager::EventType::RELEASE && event.button_index == active_button_index) {
                 Serial.printf("[main] Released after %lu ms\n", elapsed);
             stop_and_upload:
