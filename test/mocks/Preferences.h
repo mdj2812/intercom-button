@@ -31,6 +31,13 @@ public:
         return String(kv_it->second.c_str());
     }
 
+    bool isKey(const char* key) const {
+        auto ns_it = _stores.find(_ns);
+        if (ns_it == _stores.end())
+            return false;
+        return ns_it->second.find(key) != ns_it->second.end();
+    }
+
     size_t putString(const char* key, const char* value) {
         if (_readOnly)
             return 0;
