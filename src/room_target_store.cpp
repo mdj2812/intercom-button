@@ -61,11 +61,14 @@ std::string RoomTargetStore::get_room(uint8_t gpio_pin) const {
     if (prefs.begin(NVS_NS, true)) {
         std::string key = "btn_" + std::to_string(gpio_pin);
 
-        String room = prefs.getString(key.c_str(), "");
-        prefs.end();
-
-        if (room.length() > 0) {
-            return std::string(room.c_str());
+        if (prefs.isKey(key.c_str())) {
+            String room = prefs.getString(key.c_str(), "");
+            prefs.end();
+            if (room.length() > 0) {
+                return std::string(room.c_str());
+            }
+        } else {
+            prefs.end();
         }
     }
 
