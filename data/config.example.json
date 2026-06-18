@@ -1,9 +1,22 @@
 {
+    "_comment_buttons": "pins → which GPIOs to initialize as button inputs. buttons → per-pin room target defaults. These are config-file tier, sitting between NVS (runtime override) and hardcoded defaults.",
     "wifi_ssid": "your_wifi_ssid",
     "wifi_password": "your_wifi_password",
     "server_host": "192.168.99.10",
     "server_port": 8764,
     "room": "study",
     "sample_rate": 16000,
-    "max_record_secs": 60
+    "max_record_secs": 60,
+    "pins": [
+        4,
+        5,
+        12,
+        13
+    ],
+    "buttons": {
+        "4": "study",
+        "5": "living",
+        "12": "cinema",
+        "13": "bedroom"
+    }
 }
