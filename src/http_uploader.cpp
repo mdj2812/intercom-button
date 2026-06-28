@@ -1,6 +1,7 @@
 #include "http_uploader.h"
 #include <HTTPClient.h>
 #include <WiFi.h>
+#include <sstream>
 
 static const char* TAG = "upload";
 
@@ -11,8 +12,11 @@ bool HTTPUploader::upload(const uint8_t* data, size_t size, const char* server_h
         return false;
     }
 
-    char url[256];
-    snprintf(url, sizeof(url), "http://%s:%u/convert?target=%s", server_host, server_port, room_target);
+    // std::ostringstream — type-safe URL construction, no printf format-string issues
+    std::ostringstream oss;
+    oss << "http://" << server_host << ":" << server_port << "/record?target=" << room_target;
+    std::string url_str = oss.str();
+    const char* url = url_str.c_str();
 
     // Retry up to 2 times (total 3 attempts) in case of transient errors
     for (int attempt = 1; attempt <= 3; attempt++) {

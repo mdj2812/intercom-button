@@ -27,9 +27,9 @@ void test_upload_success(void) {
     bool result = HTTPUploader::upload(test_data, sizeof(test_data), "10.0.0.1", 5000, "kitchen");
     TEST_ASSERT_TRUE(result);
     TEST_ASSERT_EQUAL(1, _http_mock.post_call_count);
-    // URL should contain host, port, and room target
+    // URL should contain host, port, path, and room target
     TEST_ASSERT_TRUE(_http_mock.last_url.find("10.0.0.1:5000") != std::string::npos);
-    TEST_ASSERT_TRUE(_http_mock.last_url.find("target=kitchen") != std::string::npos);
+    TEST_ASSERT_TRUE(_http_mock.last_url.find("/record?target=kitchen") != std::string::npos);
 }
 
 // ── Test 2: HTTP error triggers retries (3 attempts) ──
@@ -70,6 +70,13 @@ void test_upload_sets_content_type_wav(void) {
     TEST_ASSERT_EQUAL_STRING("audio/wav", _http_mock.last_content_type.c_str());
 }
 
+// ── Test 6: URL format — /record?target=<room> ──
+void test_upload_url_format_is_record_endpoint(void) {
+    HTTPUploader::upload(test_data, sizeof(test_data), "192.168.1.1", 8764, "书房");
+    std::string expected = "http://192.168.1.1:8764/record?target=书房";
+    TEST_ASSERT_EQUAL_STRING(expected.c_str(), _http_mock.last_url.c_str());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_upload_success);
@@ -78,5 +85,6 @@ int main(void) {
     RUN_TEST(test_upload_null_data_returns_false);
     RUN_TEST(test_upload_zero_size_returns_false);
     RUN_TEST(test_upload_sets_content_type_wav);
+    RUN_TEST(test_upload_url_format_is_record_endpoint);
     return UNITY_END();
 }
