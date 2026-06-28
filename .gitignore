@@ -24,3 +24,4 @@ Thumbs.db
 
 # ── Hermes plan files ──────────────────────────────
 .hermes/
+scripts/ota_private.pem

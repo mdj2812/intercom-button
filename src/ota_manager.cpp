@@ -17,8 +17,12 @@
 #include <cstdio>
 #include <cstring>
 
-// ── mbedTLS SHA-256 ─────────────────────────────────────
+// ── mbedTLS SHA-256 & ECDSA ────────────────────────────
+#include <mbedtls/ecdsa.h>
+#include <mbedtls/ecp.h>
 #include <mbedtls/sha256.h>
+
+#include "ota_keys.h"
 
 namespace OTAManager {
 
@@ -84,6 +88,55 @@ bool download_and_flash() {
         s_progress.error = "WiFi not connected";
         Serial.println("[ota] FAILED: WiFi not connected");
         return false;
+    }
+
+    // ── Download signature first (tiny, 64 bytes) ──────────
+    uint8_t sig_buf[64] = {0};
+    bool have_signature = false;
+    {
+        WiFiClient sig_client;
+        sig_client.setTimeout(5000);
+        if (sig_client.connect(host, port)) {
+            String sig_path = String(s_firmware_path) + ".sig";
+            sig_client.printf("GET %s HTTP/1.0\r\nHost: %s:%u\r\nConnection: close\r\n\r\n", sig_path.c_str(), host,
+                              port);
+
+            // Skip headers
+            String hdr_line;
+            int sig_content_len = -1;
+            while (sig_client.connected() || sig_client.available()) {
+                hdr_line = sig_client.readStringUntil('\n');
+                hdr_line.trim();
+                if (hdr_line.length() == 0)
+                    break;
+                if (hdr_line.startsWith("Content-Length:")) {
+                    String cl = hdr_line.substring(15);
+                    cl.trim();
+                    sig_content_len = cl.toInt();
+                }
+            }
+
+            if (sig_content_len == 64) {
+                size_t total = 0;
+                while (total < 64 && sig_client.connected()) {
+                    int avail = sig_client.available();
+                    if (avail > 0) {
+                        int r = sig_client.read(sig_buf + total, 64 - total);
+                        if (r > 0)
+                            total += r;
+                    }
+                    delay(1);
+                }
+                if (total == 64) {
+                    have_signature = true;
+                    Serial.println("[ota] Signature downloaded (64 bytes)");
+                }
+            }
+            sig_client.stop();
+        }
+        if (!have_signature) {
+            Serial.println("[ota] No signature file found — proceeding without ECDSA verification");
+        }
     }
 
     // ── Connect ───────────────────────────────────────────
@@ -261,6 +314,57 @@ bool download_and_flash() {
     } else {
         // No checksum from server — log warning but proceed
         Serial.println("[ota] WARNING: No X-Checksum-SHA256 header — skipping verification");
+    }
+
+    // ── ECDSA signature verification ───────────────────────
+    if (have_signature) {
+        Serial.println("[ota] Verifying ECDSA signature...");
+
+        mbedtls_ecdsa_context ecdsa;
+        mbedtls_ecdsa_init(&ecdsa);
+
+        int ret = mbedtls_ecp_group_load(&ecdsa.grp, MBEDTLS_ECP_DP_SECP256R1);
+        if (ret != 0) {
+            s_progress.state = State::FAILED;
+            s_progress.error = "ECDSA: failed to load curve";
+            Serial.printf("[ota] FAILED: ecp_group_load returned %d\n", ret);
+            mbedtls_ecdsa_free(&ecdsa);
+            Update.abort();
+            return false;
+        }
+
+        ret = mbedtls_ecp_point_read_binary(&ecdsa.grp, &ecdsa.Q, OTA_PUBLIC_KEY, OTA_PUBLIC_KEY_LEN);
+        if (ret != 0) {
+            s_progress.state = State::FAILED;
+            s_progress.error = "ECDSA: failed to load public key";
+            Serial.printf("[ota] FAILED: ecp_point_read_binary returned %d\n", ret);
+            mbedtls_ecdsa_free(&ecdsa);
+            Update.abort();
+            return false;
+        }
+
+        // Parse raw r||s (32 + 32 bytes)
+        mbedtls_mpi r, s;
+        mbedtls_mpi_init(&r);
+        mbedtls_mpi_init(&s);
+        mbedtls_mpi_read_binary(&r, sig_buf, 32);
+        mbedtls_mpi_read_binary(&s, sig_buf + 32, 32);
+
+        ret = mbedtls_ecdsa_verify(&ecdsa.grp, computed_hash, 32, &ecdsa.Q, &r, &s);
+
+        mbedtls_mpi_free(&r);
+        mbedtls_mpi_free(&s);
+        mbedtls_ecdsa_free(&ecdsa);
+
+        if (ret != 0) {
+            s_progress.state = State::FAILED;
+            s_progress.error = "ECDSA: signature verification failed";
+            Serial.printf("[ota] FAILED: ECDSA signature invalid (ret=%d)\n", ret);
+            Update.abort();
+            return false;
+        }
+
+        Serial.println("[ota] ECDSA signature verified OK");
     }
 
     // ── Finalize flash ────────────────────────────────────
