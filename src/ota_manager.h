@@ -4,7 +4,7 @@
  * @brief Over-the-air firmware update module.
  *
  * Downloads firmware binary over HTTP, streams to the inactive OTA partition,
- * verifies SHA-256 checksum, and reports progress.
+ * verifies SHA-256 checksum + ECDSA signature, and manages rollback.
  */
 
 #include <cstdint>
@@ -30,13 +30,13 @@ struct Progress {
 /**
  * Init the OTA manager. Must be called once in setup().
  * Reads OTA config from ConfigManager.
+ * Checks boot state: if we just OTA'd, enters pending_verify mode.
  */
 bool begin();
 
 /**
  * Download firmware from the configured URL and flash to the inactive
- * OTA partition. SHA-256 checksum is verified against the
- * X-Checksum-SHA256 response header.
+ * OTA partition. SHA-256 checksum and ECDSA signature are verified.
  *
  * Blocks during download. Returns true if flash + verify succeeded.
  */
@@ -47,5 +47,26 @@ Progress progress();
 
 /** Convenience: returns true if an update was just completed successfully. */
 bool update_pending();
+
+// ── Rollback / boot confirmation ─────────────────────
+
+/** True if current boot is from a pending-verify OTA slot. */
+bool is_pending_verify();
+
+/**
+ * Confirm the current boot as successful.
+ * Marks the OTA image as valid so bootloader won't roll back.
+ * Resets the consecutive-failure counter in NVS.
+ */
+void confirm_boot();
+
+/** Number of consecutive boot failures for the current image. */
+int boot_failure_count();
+
+/** Maximum allowed consecutive failures before permanently rejecting an image. */
+static constexpr int MAX_BOOT_FAILURES = 3;
+
+/** Seconds to wait for user confirmation before auto-rollback. */
+static constexpr unsigned long CONFIRM_TIMEOUT_SEC = 60;
 
 } // namespace OTAManager

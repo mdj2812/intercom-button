@@ -17,6 +17,9 @@
 #include <cstdio>
 #include <cstring>
 
+#include <esp_ota_ops.h>
+#include <Preferences.h>
+
 // ── mbedTLS SHA-256 & ECDSA ────────────────────────────
 #include <mbedtls/ecdsa.h>
 #include <mbedtls/ecp.h>
@@ -383,6 +386,52 @@ bool download_and_flash() {
     Serial.println("[ota] REBOOT to apply the update.");
 
     return true;
+}
+
+// ── Rollback / Boot Confirmation ────────────────────────
+
+bool is_pending_verify() {
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    if (!running)
+        return false;
+
+    esp_ota_img_states_t state;
+    if (esp_ota_get_state_partition(running, &state) != ESP_OK)
+        return false;
+
+    return state == ESP_OTA_IMG_PENDING_VERIFY;
+}
+
+void confirm_boot() {
+    esp_ota_mark_app_valid_cancel_rollback();
+
+    // Reset consecutive failure counter
+    Preferences prefs;
+    if (prefs.begin("ota", false)) {
+        prefs.putUInt("fail_count", 0);
+        prefs.end();
+    }
+
+    Serial.println("[ota] Boot confirmed — image marked valid");
+}
+
+int boot_failure_count() {
+    Preferences prefs;
+    if (!prefs.begin("ota", true))
+        return 0;
+    unsigned int count = prefs.getUInt("fail_count", 0);
+    prefs.end();
+    return (int) count;
+}
+
+static void increment_failure_count() {
+    Preferences prefs;
+    if (prefs.begin("ota", false)) {
+        unsigned int count = prefs.getUInt("fail_count", 0) + 1;
+        prefs.putUInt("fail_count", count);
+        prefs.end();
+        Serial.printf("[ota] Boot failure count: %u/%d\n", count, MAX_BOOT_FAILURES);
+    }
 }
 
 } // namespace OTAManager

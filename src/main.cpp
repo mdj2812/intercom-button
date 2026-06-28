@@ -33,7 +33,7 @@ static Adafruit_NeoPixel led(1, PIN_LED_WS2812, NEO_GRB + NEO_KHZ800);
 static const uint8_t* active_pins = BUTTON_PINS;
 static uint8_t active_pin_count = BUTTON_COUNT;
 
-enum class State { IDLE, RECORDING, UPLOADING, OTA };
+enum class State { IDLE, RECORDING, UPLOADING, CONFIRMING, OTA };
 static State state = State::IDLE;
 static unsigned long record_start_ms = 0;
 static const unsigned long MIN_RECORD_MS = 500;
@@ -41,6 +41,7 @@ static unsigned long MAX_RECORD_MS = 60000; // updated from config
 
 static uint8_t active_button_index = 0; // which button triggered recording
 static unsigned long upload_start_ms = 0;
+static unsigned long confirm_deadline_ms = 0; // boot confirmation timeout
 
 // ── LED helpers ─────────────────────────────────────
 
@@ -104,6 +105,22 @@ void setup() {
 
     // ── OTA manager ─────────────────────────────────
     OTAManager::begin();
+
+    // ── Boot confirmation (after OTA reboot) ────────
+    if (OTAManager::is_pending_verify()) {
+        int fail_count = OTAManager::boot_failure_count();
+        Serial.printf("[main] OTA boot — pending verification (failures: %d/%d)\n", fail_count,
+                      OTAManager::MAX_BOOT_FAILURES);
+
+        if (fail_count >= OTAManager::MAX_BOOT_FAILURES) {
+            Serial.println("[main] Too many failures — rolling back");
+            ESP.restart();
+        }
+
+        state = State::CONFIRMING;
+        confirm_deadline_ms = millis() + OTAManager::CONFIRM_TIMEOUT_SEC * 1000UL;
+        Serial.printf("[main] Confirm boot within %lu seconds (press any button)\n", OTAManager::CONFIRM_TIMEOUT_SEC);
+    }
 
     Serial.println("Setup complete — ready.");
 }
@@ -212,6 +229,47 @@ void loop() {
             }
 
             state = State::IDLE;
+            break;
+        }
+
+        case State::CONFIRMING: {
+            // Blink orange — fast blink for urgency
+            led_blink(255, 128, 0, 300);
+
+            // Button press = user confirms boot OK
+            if (event.type == ButtonManager::EventType::PRESS) {
+                OTAManager::confirm_boot();
+                led_set(0, 255, 0);
+                delay(500);
+                led_set(0, 0, 0);
+                Serial.println("[main] Boot confirmed — normal operation");
+                state = State::IDLE;
+                break;
+            }
+
+            // Serial command confirm
+            if (Serial.available()) {
+                String cmd = Serial.readStringUntil('\n');
+                cmd.trim();
+                if (cmd == "confirm") {
+                    OTAManager::confirm_boot();
+                    led_set(0, 255, 0);
+                    delay(500);
+                    led_set(0, 0, 0);
+                    Serial.println("[main] Boot confirmed via serial");
+                    state = State::IDLE;
+                    break;
+                }
+            }
+
+            // Timeout → rollback
+            if (millis() > confirm_deadline_ms) {
+                Serial.println("[main] Boot confirmation timeout — rolling back");
+                // ESP32 bootloader handles actual rollback on next boot
+                led_set(255, 0, 0);
+                delay(1000);
+                ESP.restart();
+            }
             break;
         }
 
