@@ -1,7 +1,7 @@
 #include "http_uploader.h"
 #include <HTTPClient.h>
 #include <WiFi.h>
-#include <format>
+#include <sstream>
 
 static const char* TAG = "upload";
 
@@ -12,11 +12,11 @@ bool HTTPUploader::upload(const uint8_t* data, size_t size, const char* server_h
         return false;
     }
 
-    // std::format_to_n writes at most buf_size-1 chars; {} replaces printf %s/%u
-    char url[256];
-    auto result = std::format_to_n(url, sizeof(url), "http://{}:{}/record?target={}",
-                                   server_host, server_port, room_target);
-    *result.out = '\0';
+    // std::ostringstream — type-safe URL construction, no printf format-string issues
+    std::ostringstream oss;
+    oss << "http://" << server_host << ":" << server_port << "/record?target=" << room_target;
+    std::string url_str = oss.str();
+    const char* url = url_str.c_str();
 
     // Retry up to 2 times (total 3 attempts) in case of transient errors
     for (int attempt = 1; attempt <= 3; attempt++) {
