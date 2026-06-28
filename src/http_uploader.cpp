@@ -12,7 +12,7 @@ bool HTTPUploader::upload(const uint8_t* data, size_t size, const char* server_h
     }
 
     char url[256];
-    snprintf(url, sizeof(url), "http://%s:%u/convert?target=%s", server_host, server_port, room_target);
+    snprintf(url, sizeof(url), "http://%s:%u/record?target=%s", server_host, server_port, room_target);
 
     // Retry up to 2 times (total 3 attempts) in case of transient errors
     for (int attempt = 1; attempt <= 3; attempt++) {

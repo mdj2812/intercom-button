@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 
-/// HTTP POST WAV data to Flask intercom server /convert endpoint.
+/// HTTP POST WAV data to Flask intercom server /record endpoint.
 namespace HTTPUploader {
 
 /// POST WAV audio to server. Blocks until HTTP response received.
