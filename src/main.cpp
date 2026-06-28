@@ -18,6 +18,7 @@
 #include "config.h"
 #include "config_manager.h"
 #include "http_uploader.h"
+#include "ota_manager.h"
 #include "room_target_store.h"
 #include "wifi_manager.h"
 #include <Arduino.h>
@@ -32,7 +33,7 @@ static Adafruit_NeoPixel led(1, PIN_LED_WS2812, NEO_GRB + NEO_KHZ800);
 static const uint8_t* active_pins = BUTTON_PINS;
 static uint8_t active_pin_count = BUTTON_COUNT;
 
-enum class State { IDLE, RECORDING, UPLOADING };
+enum class State { IDLE, RECORDING, UPLOADING, OTA };
 static State state = State::IDLE;
 static unsigned long record_start_ms = 0;
 static const unsigned long MIN_RECORD_MS = 500;
@@ -101,6 +102,9 @@ void setup() {
         }
     }
 
+    // ── OTA manager ─────────────────────────────────
+    OTAManager::begin();
+
     Serial.println("Setup complete — ready.");
 }
 
@@ -109,6 +113,22 @@ void setup() {
 void loop() {
     bool wifi_ok = WiFiManager::update();
     auto event = buttons.poll();
+
+    // ── Serial commands ─────────────────────────────
+    if (Serial.available()) {
+        String cmd = Serial.readStringUntil('\n');
+        cmd.trim();
+        if (cmd == "ota" && state == State::IDLE && wifi_ok) {
+            Serial.println("[main] OTA update triggered via serial");
+            state = State::OTA;
+        } else if (cmd == "reboot") {
+            Serial.println("[main] Rebooting...");
+            delay(100);
+            ESP.restart();
+        } else if (cmd.length() > 0) {
+            Serial.printf("[main] Unknown command: '%s' (try 'ota' or 'reboot')\n", cmd.c_str());
+        }
+    }
 
     switch (state) {
 
@@ -192,6 +212,36 @@ void loop() {
             }
 
             state = State::IDLE;
+            break;
+        }
+
+        case State::OTA: {
+            led_set(255, 128, 0); // orange = OTA in progress
+
+            bool ok = OTAManager::download_and_flash();
+
+            if (ok) {
+                // Success — blink green 3x then reboot
+                for (int i = 0; i < 3; i++) {
+                    led_set(0, 255, 0);
+                    delay(200);
+                    led_set(0, 0, 0);
+                    delay(200);
+                }
+                Serial.println("[main] OTA success — rebooting...");
+                delay(500);
+                ESP.restart();
+            } else {
+                // Failure — blink red 3x, return to IDLE
+                Serial.printf("[main] OTA failed: %s\n", OTAManager::progress().error);
+                for (int i = 0; i < 3; i++) {
+                    led_set(255, 0, 0);
+                    delay(200);
+                    led_set(0, 0, 0);
+                    delay(200);
+                }
+                state = State::IDLE;
+            }
             break;
         }
 
