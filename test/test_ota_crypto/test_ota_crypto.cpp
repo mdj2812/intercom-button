@@ -8,8 +8,6 @@
 #include <cstring>
 #include <unity.h>
 
-// ── Pure helpers (mirror of ota_crypto.cpp for native testing) ──
-
 static void hexify(const uint8_t* hash, char* out) {
     for (int i = 0; i < 32; i++)
         sprintf(out + i * 2, "%02x", hash[i]);
@@ -93,9 +91,12 @@ void test_ecdsa_sign_verify_roundtrip() {
     fwrite(TEST_PAYLOAD, 1, strlen(TEST_PAYLOAD), f);
     fclose(f);
 
-    system("openssl ec -in scripts/ota_private.pem -pubout "
+    // Generate ephemeral key pair for this test
+    system("openssl ecparam -name prime256v1 -genkey "
+           "-out /tmp/ota_test_key.pem 2>/dev/null");
+    system("openssl ec -in /tmp/ota_test_key.pem -pubout "
            "-out /tmp/ota_test_pub.pem 2>/dev/null");
-    system("openssl dgst -sha256 -sign scripts/ota_private.pem "
+    system("openssl dgst -sha256 -sign /tmp/ota_test_key.pem "
            "-out /tmp/ota_test_sig.der "
            "/tmp/ota_test_payload.bin 2>/dev/null");
 
@@ -133,7 +134,9 @@ void test_ecdsa_bad_signature() {
     fwrite(fake_der, 1, pos, f);
     fclose(f);
 
-    system("openssl ec -in scripts/ota_private.pem -pubout "
+    system("openssl ecparam -name prime256v1 -genkey "
+           "-out /tmp/ota_test_key2.pem 2>/dev/null");
+    system("openssl ec -in /tmp/ota_test_key2.pem -pubout "
            "-out /tmp/ota_test_pub.pem 2>/dev/null");
 
     FILE* vp = popen(
