@@ -133,12 +133,6 @@ void setup() {
     // ── Boot confirmation (after OTA reboot) ────────
     {
         const esp_partition_t* running = esp_ota_get_running_partition();
-        esp_ota_img_states_t ota_state = ESP_OTA_IMG_UNDEFINED;
-        esp_err_t ret = esp_ota_get_state_partition(running, &ota_state);
-        Serial.printf("[main] Running partition: %s, ota state=%d (ret=%d), subtype=%d\n",
-                      running ? running->label : "NULL", ota_state, ret, running ? running->subtype : -1);
-
-        // If NVS has stale pending flags but we're on factory, clear them
         if (running && running->subtype == 0) { // factory subtype
             Preferences prefs;
             if (prefs.begin("ota", false)) {
