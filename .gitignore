@@ -24,4 +24,6 @@ Thumbs.db
 
 # ── Hermes plan files ──────────────────────────────
 .hermes/
+
+# ── OTA signing keys ───────────────────────────────
 scripts/ota_private.pem

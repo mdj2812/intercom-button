@@ -1,6 +1,6 @@
-# ESP32-S3 Desktop Intercom Button
+# Intercom Button
 
-Push-to-talk desktop button for the [home-intercom](https://gitea.home.mdj2812.top/home_lab/home-intercom) system. Press and hold to record, release to broadcast to a target room via Xiaomi smart speakers.
+ESP32-S3 push-to-talk desktop button for the [home-intercom](https://github.com/mdj2812/home-intercom) system. Press and hold to record, release to broadcast to a target room via Xiaomi smart speakers.
 
 ## Hardware
 
@@ -132,9 +132,6 @@ make docker-shell
 
 # Rebuild Docker image locally
 ./docker/dev.sh -b
-
-# Build + push to local registry
-./docker/dev.sh -b -p
 ```
 
 ## Architecture
@@ -172,31 +169,40 @@ make docker-shell
 
 ## Project Structure
 
-```
-esp32-intercom-button/
+```text
+intercom-button/
 ├── .clang-format            # C++ code style rules
 ├── .editorconfig            # Editor settings
 ├── Makefile                 # Convenience commands
 ├── platformio.ini           # PlatformIO project config
-├── .gitea/
-│   └── workflows/ci.yml     # CI pipeline (build, check, test, format)
+├── .github/
+│   └── workflows/ci.yml     # CI pipeline (build, check, test, format, coverage)
 ├── docker/
 │   ├── Dockerfile           # Self-contained dev image
-│   ├── .docker-image        # Full registry path + version
+│   ├── .docker-image        # Image version tag
 │   └── dev.sh               # One-command dev container
 ├── data/
 │   ├── config.example.json  # Template (committed)
 │   └── config.json          # Your settings (gitignored, uploaded to LittleFS)
 ├── test/
-│   └── test_config/
-│       └── test_main.cpp    # Unit tests (JSON + WAV header)
+│   ├── mocks/               # Mock Arduino/ESP headers
+│   ├── test_config/         # Config parsing tests
+│   ├── test_config_manager/ # Config manager tests
+│   ├── test_http_uploader/  # HTTP upload tests
+│   ├── test_wifi_manager/   # WiFi manager tests
+│   ├── test_button_manager/ # Button manager tests
+│   └── test_room_target_store/ # Room store tests
 └── src/
-    ├── main.cpp             # State machine: IDLE→RECORD→UPLOAD
+    ├── main.cpp             # State machine: IDLE→RECORDING→UPLOADING
     ├── config.h             # Pin definitions
+    ├── consts.hpp           # Shared constants
     ├── config_manager.h/cpp # JSON config loader (LittleFS)
     ├── wifi_manager.h/cpp   # Non-blocking WiFi + auto-reconnect
     ├── audio_recorder.h/cpp # 16kHz timer ISR → PSRAM → WAV
-    └── http_uploader.h/cpp  # POST /convert?target=<room>
+    ├── http_uploader.h/cpp  # POST /record?target=<room>
+    ├── button_manager.h/cpp # Multi-button GPIO matrix + debounce
+    ├── room_target_store.h/cpp # NVS room target storage
+    └── ota_manager.h/cpp    # OTA firmware update (optional)
 ```
 
 ## Environments
@@ -261,7 +267,7 @@ The firmware logs every state transition:
 [main] Setup complete — ready.
 [main] Recording...
 [audio] Stopped — 48000 samples (3.0s)
-[upload] POST http://192.168.99.10:8764/convert?target=study (96044 bytes) attempt 1/3
+[upload] POST http://192.168.99.10:8764/record?target=study (96044 bytes) attempt 1/3
 [upload] OK: {"ok":true,"rooms_sent":1,...}
 [main] Upload OK (1725 ms)
 ```
