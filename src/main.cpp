@@ -115,6 +115,17 @@ void setup() {
         Serial.printf("[main] Running partition: %s, ota state=%d (ret=%d), subtype=%d\n",
                       running ? running->label : "NULL",
                       ota_state, ret, running ? running->subtype : -1);
+
+        // If NVS has stale pending flags but we're on factory, clear them
+        if (running && running->subtype == 0) { // factory subtype
+            Preferences prefs;
+            if (prefs.begin("ota", false)) {
+                prefs.putBool("pending", false);
+                prefs.putUInt("fail_count", 0);
+                prefs.end();
+                Serial.println("[main] Factory boot — cleared stale OTA flags");
+            }
+        }
     }
     if (OTAManager::is_pending_verify()) {
         int fail_count = OTAManager::boot_failure_count();
