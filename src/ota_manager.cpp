@@ -20,11 +20,10 @@
 #include <esp_ota_ops.h>
 #include <Preferences.h>
 
-// ── mbedTLS SHA-256 & ECDSA ────────────────────────────
-#include <mbedtls/ecdsa.h>
-#include <mbedtls/ecp.h>
+// ── mbedTLS SHA-256 ──────────────────────────────────
 #include <mbedtls/sha256.h>
 
+#include "ota_crypto.h"
 #include "ota_keys.h"
 
 namespace OTAManager {
@@ -34,30 +33,6 @@ namespace OTAManager {
 static Progress s_progress;
 static char s_firmware_path[128] = "/esp32-intercom-button.bin";
 static bool s_update_pending = false;
-
-// ── Helpers ──────────────────────────────────────────────
-
-/** Convert 32-byte binary hash to lowercase hex string. */
-static void hexify(const uint8_t* hash, char* out) {
-    for (int i = 0; i < 32; i++) {
-        sprintf(out + i * 2, "%02x", hash[i]);
-    }
-    out[64] = '\0';
-}
-
-/** Parse hex string to binary. Returns false on parse error. */
-static bool unhexify(const char* hex, uint8_t* out) {
-    // Expected: 64 hex chars
-    if (strlen(hex) != 64)
-        return false;
-    for (int i = 0; i < 32; i++) {
-        unsigned int byte;
-        if (sscanf(hex + i * 2, "%2x", &byte) != 1)
-            return false;
-        out[i] = (uint8_t) byte;
-    }
-    return true;
-}
 
 // ── Public API ───────────────────────────────────────────
 
@@ -299,13 +274,13 @@ bool download_and_flash() {
     mbedtls_sha256_free(&sha);
 
     char computed_hex[65];
-    hexify(computed_hash, computed_hex);
+    OTACrypto::hexify(computed_hash, computed_hex);
     Serial.printf("[ota] SHA-256: %s\n", computed_hex);
 
     if (expected_sha_hex[0] != '\0') {
         // Server provided expected checksum — verify
         uint8_t expected_hash[32];
-        if (!unhexify(expected_sha_hex, expected_hash)) {
+        if (!OTACrypto::unhexify(expected_sha_hex, expected_hash)) {
             s_progress.state = State::FAILED;
             s_progress.error = "Bad checksum header format";
             Serial.printf("[ota] FAILED: Could not parse checksum header '%s'\n", expected_sha_hex);
@@ -315,7 +290,7 @@ bool download_and_flash() {
 
         if (memcmp(computed_hash, expected_hash, 32) != 0) {
             char expected_hex[65];
-            hexify(expected_hash, expected_hex);
+            OTACrypto::hexify(expected_hash, expected_hex);
             s_progress.state = State::FAILED;
             s_progress.error = "SHA-256 mismatch";
             Serial.printf("[ota] FAILED: SHA-256 mismatch\n  got:      %s\n  expected: %s\n", computed_hex,
@@ -333,46 +308,10 @@ bool download_and_flash() {
     if (have_signature) {
         Serial.println("[ota] Verifying ECDSA signature...");
 
-        mbedtls_ecdsa_context ecdsa;
-        mbedtls_ecdsa_init(&ecdsa);
-
-        int ret = mbedtls_ecp_group_load(&ecdsa.grp, MBEDTLS_ECP_DP_SECP256R1);
-        if (ret != 0) {
-            s_progress.state = State::FAILED;
-            s_progress.error = "ECDSA: failed to load curve";
-            Serial.printf("[ota] FAILED: ecp_group_load returned %d\n", ret);
-            mbedtls_ecdsa_free(&ecdsa);
-            Update.abort();
-            return false;
-        }
-
-        ret = mbedtls_ecp_point_read_binary(&ecdsa.grp, &ecdsa.Q, OTA_PUBLIC_KEY, OTA_PUBLIC_KEY_LEN);
-        if (ret != 0) {
-            s_progress.state = State::FAILED;
-            s_progress.error = "ECDSA: failed to load public key";
-            Serial.printf("[ota] FAILED: ecp_point_read_binary returned %d\n", ret);
-            mbedtls_ecdsa_free(&ecdsa);
-            Update.abort();
-            return false;
-        }
-
-        // Parse raw r||s (32 + 32 bytes)
-        mbedtls_mpi r, s;
-        mbedtls_mpi_init(&r);
-        mbedtls_mpi_init(&s);
-        mbedtls_mpi_read_binary(&r, sig_buf, 32);
-        mbedtls_mpi_read_binary(&s, sig_buf + 32, 32);
-
-        ret = mbedtls_ecdsa_verify(&ecdsa.grp, computed_hash, 32, &ecdsa.Q, &r, &s);
-
-        mbedtls_mpi_free(&r);
-        mbedtls_mpi_free(&s);
-        mbedtls_ecdsa_free(&ecdsa);
-
-        if (ret != 0) {
+        if (!OTACrypto::verify_ecdsa_signature(computed_hash, sig_buf, OTA_PUBLIC_KEY, OTA_PUBLIC_KEY_LEN)) {
             s_progress.state = State::FAILED;
             s_progress.error = "ECDSA: signature verification failed";
-            Serial.printf("[ota] FAILED: ECDSA signature invalid (ret=%d)\n", ret);
+            Serial.println("[ota] FAILED: ECDSA signature invalid");
             Update.abort();
             return false;
         }
