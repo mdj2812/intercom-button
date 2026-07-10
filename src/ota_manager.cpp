@@ -397,6 +397,15 @@ bool download_and_flash() {
     }
     Serial.printf("[ota] Boot partition → %s\n", target_part->label);
 
+    // Set NVS flag: boot confirmation needed on next boot
+    {
+        Preferences prefs;
+        if (prefs.begin("ota", false)) {
+            prefs.putBool("pending", true);
+            prefs.end();
+        }
+    }
+
     s_progress.state = State::SUCCESS;
     s_progress.percent = 100;
     s_update_pending = true;
@@ -410,23 +419,21 @@ bool download_and_flash() {
 // ── Rollback / Boot Confirmation ────────────────────────
 
 bool is_pending_verify() {
-    const esp_partition_t* running = esp_ota_get_running_partition();
-    if (!running)
+    Preferences prefs;
+    if (!prefs.begin("ota", true))
         return false;
-
-    esp_ota_img_states_t state;
-    if (esp_ota_get_state_partition(running, &state) != ESP_OK)
-        return false;
-
-    return state == ESP_OTA_IMG_PENDING_VERIFY;
+    bool pending = prefs.getBool("pending", false);
+    prefs.end();
+    return pending;
 }
 
 void confirm_boot() {
     esp_ota_mark_app_valid_cancel_rollback();
 
-    // Reset consecutive failure counter
+    // Reset NVS flags
     Preferences prefs;
     if (prefs.begin("ota", false)) {
+        prefs.putBool("pending", false);
         prefs.putUInt("fail_count", 0);
         prefs.end();
     }
