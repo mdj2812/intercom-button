@@ -109,6 +109,7 @@ bool download_and_flash() {
     {
         WiFiClient sig_client;
         sig_client.setTimeout(5000);
+        Serial.printf("[ota] Fetching signature: %s:%u%s.sig\n", host, port, s_firmware_path);
         if (sig_client.connect(host, port)) {
             String sig_path = String(s_firmware_path) + ".sig";
             sig_client.printf("GET %s HTTP/1.0\r\nHost: %s:%u\r\nConnection: close\r\n\r\n", sig_path.c_str(), host,
@@ -144,8 +145,12 @@ bool download_and_flash() {
                     have_signature = true;
                     Serial.println("[ota] Signature downloaded (64 bytes)");
                 }
+            } else {
+                Serial.printf("[ota] Signature Content-Length = %d (expected 64)\n", sig_content_len);
             }
             sig_client.stop();
+        } else {
+            Serial.println("[ota] Could not connect for signature download");
         }
         if (!have_signature) {
             Serial.println("[ota] No signature file found — proceeding without ECDSA verification");
