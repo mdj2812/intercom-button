@@ -23,6 +23,7 @@
 #include "wifi_manager.h"
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
+#include <esp_ota_ops.h>
 
 // ── Globals ─────────────────────────────────────────
 static ButtonManager buttons;
