@@ -3,10 +3,9 @@
 # ESP32-S3 开发容器 — 一键进入
 #
 # 用法:
-#   ./docker/dev.sh             从 registry 拉取或本地构建 → 交互式 shell
+#   ./docker/dev.sh             本地构建或使用已有镜像 → 交互式 shell
 #   ./docker/dev.sh pio run     执行命令后退出
 #   ./docker/dev.sh -b          强制本地重建
-#   ./docker/dev.sh -b -p       构建 + 推送 registry
 #
 # 镜像自包含工具链 (3GB)，无需挂载宿主机 .platformio。
 # ────────────────────────────────────────────────────

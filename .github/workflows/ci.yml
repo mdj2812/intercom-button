@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Makefile'
+      - 'src/**'
+      - 'test/**'
+      - 'platformio.ini'
+      - 'extra_script.py'
+      - '.clang-format'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Makefile'
+      - 'src/**'
+      - 'test/**'
+      - 'platformio.ini'
+      - 'extra_script.py'
+      - '.clang-format'
+      - '.github/workflows/ci.yml'
+
+jobs:
+  # ── Firmware Build ────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PlatformIO
+        run: pip install platformio
+      - name: Build firmware
+        run: pio run -e esp32-s3-devkitc-1
+      - name: Show binary size
+        run: pio run -e esp32-s3-devkitc-1 -t size
+
+  # ── Static Analysis ───────────────────────────────
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PlatformIO
+        run: pip install platformio
+      - name: PlatformIO check (cppcheck)
+        run: pio check -e esp32-s3-devkitc-1 --fail-on-defect=high --skip-packages 2>&1 || true
+
+  # ── Code Format ───────────────────────────────────
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang-format
+      - name: Check code formatting
+        run: clang-format --dry-run -Werror src/*.cpp src/*.h $(find test -name '*.cpp')
+
+  # ── Unit Tests (native, no hardware needed) ──────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PlatformIO
+        run: pip install platformio
+      - name: Run unit tests
+        run: pio test -e native -v
+
+  # ── Code Coverage (native tests) ──────────────────
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PlatformIO + lcov
+        run: |
+          pip install platformio
+          sudo apt-get update -qq && sudo apt-get install -y -qq lcov
+      - name: Build & run tests with coverage
+        run: make test-coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
