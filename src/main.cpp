@@ -169,8 +169,8 @@ void loop() {
     bool wifi_ok = WiFiManager::update();
     auto event = buttons.poll();
 
-    // ── Serial commands ─────────────────────────────
-    if (Serial.available()) {
+    // ── Serial commands (skip in CONFIRMING/OTA — they have their own handlers)
+    if (Serial.available() && state != State::CONFIRMING && state != State::OTA) {
         String cmd = Serial.readStringUntil('\n');
         cmd.trim();
         if (cmd == "ota" && state == State::IDLE && wifi_ok) {
