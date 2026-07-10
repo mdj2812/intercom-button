@@ -370,22 +370,23 @@ bool download_and_flash() {
         Serial.println("[ota] ECDSA signature verified OK");
     }
 
+    // ── Set boot partition BEFORE finalizing flash ──────────
+    // Per ESP-IDF docs: set boot partition, THEN end update.
+    const esp_partition_t* new_part = esp_ota_get_next_update_partition(nullptr);
+    if (!new_part || esp_ota_set_boot_partition(new_part) != ESP_OK) {
+        s_progress.state = State::FAILED;
+        s_progress.error = "Failed to set boot partition";
+        Serial.println("[ota] FAILED: Could not set boot partition");
+        Update.abort();
+        return false;
+    }
+    Serial.printf("[ota] Boot partition → %s\n", new_part->label);
+
     // ── Finalize flash ────────────────────────────────────
     if (!Update.end()) {
         s_progress.state = State::FAILED;
         s_progress.error = Update.errorString();
         Serial.printf("[ota] FAILED: Update.end() — %s\n", Update.errorString());
-        return false;
-    }
-
-    // Set boot partition to the newly flashed OTA slot
-    const esp_partition_t* new_part = esp_ota_get_next_update_partition(nullptr);
-    if (new_part && esp_ota_set_boot_partition(new_part) == ESP_OK) {
-        Serial.printf("[ota] Boot partition → %s\n", new_part->label);
-    } else {
-        s_progress.state = State::FAILED;
-        s_progress.error = "Failed to set boot partition";
-        Serial.println("[ota] FAILED: Could not set boot partition");
         return false;
     }
 

@@ -110,11 +110,11 @@ void setup() {
     // ── Boot confirmation (after OTA reboot) ────────
     {
         const esp_partition_t* running = esp_ota_get_running_partition();
-        esp_ota_img_states_t ota_state;
-        esp_ota_get_state_partition(running, &ota_state);
-        Serial.printf("[main] Running partition: %s, ota state=%d, subtype=%d\n",
+        esp_ota_img_states_t ota_state = ESP_OTA_IMG_UNDEFINED;
+        esp_err_t ret = esp_ota_get_state_partition(running, &ota_state);
+        Serial.printf("[main] Running partition: %s, ota state=%d (ret=%d), subtype=%d\n",
                       running ? running->label : "NULL",
-                      ota_state, running ? running->subtype : -1);
+                      ota_state, ret, running ? running->subtype : -1);
     }
     if (OTAManager::is_pending_verify()) {
         int fail_count = OTAManager::boot_failure_count();
