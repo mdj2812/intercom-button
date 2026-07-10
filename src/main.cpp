@@ -21,9 +21,10 @@
 #include "ota_manager.h"
 #include "room_target_store.h"
 #include "wifi_manager.h"
+
 #include <Arduino.h>
-#include <Adafruit_NeoPixel.h>
 #include <esp_ota_ops.h>
+#include <Adafruit_NeoPixel.h>
 #include <Preferences.h>
 
 // ── Globals ─────────────────────────────────────────
@@ -50,6 +51,15 @@ static unsigned long confirm_deadline_ms = 0; // boot confirmation timeout
 static void led_set(uint8_t r, uint8_t g, uint8_t b) {
     led.setPixelColor(0, led.Color(r, g, b));
     led.show();
+}
+
+static void led_blink_n(uint8_t r, uint8_t g, uint8_t b, int count, int interval_ms) {
+    for (int i = 0; i < count; i++) {
+        led_set(r, g, b);
+        delay(interval_ms);
+        led_set(0, 0, 0);
+        delay(interval_ms);
+    }
 }
 
 static void led_blink(uint8_t r, uint8_t g, uint8_t b, unsigned long period_ms) {
@@ -114,8 +124,7 @@ void setup() {
         esp_ota_img_states_t ota_state = ESP_OTA_IMG_UNDEFINED;
         esp_err_t ret = esp_ota_get_state_partition(running, &ota_state);
         Serial.printf("[main] Running partition: %s, ota state=%d (ret=%d), subtype=%d\n",
-                      running ? running->label : "NULL",
-                      ota_state, ret, running ? running->subtype : -1);
+                      running ? running->label : "NULL", ota_state, ret, running ? running->subtype : -1);
 
         // If NVS has stale pending flags but we're on factory, clear them
         if (running && running->subtype == 0) { // factory subtype
@@ -244,12 +253,7 @@ void loop() {
             unsigned long upload_ms = millis() - upload_start_ms;
             Serial.printf("[main] Upload to %s %s (%lu ms)\n", room.c_str(), ok ? "OK" : "FAILED", upload_ms);
 
-            for (int i = 0; i < 4; i++) {
-                led_set(ok ? 0 : 255, ok ? 255 : 0, 0);
-                delay(125);
-                led_set(0, 0, 0);
-                delay(125);
-            }
+            led_blink_n(ok ? 0 : 255, ok ? 255 : 0, 0, 4, 125);
 
             state = State::IDLE;
             break;
@@ -262,9 +266,7 @@ void loop() {
             // Button press = user confirms boot OK
             if (event.type == ButtonManager::EventType::PRESS) {
                 OTAManager::confirm_boot();
-                led_set(0, 255, 0);
-                delay(500);
-                led_set(0, 0, 0);
+                led_blink_n(0, 255, 0, 1, 250);
                 Serial.println("[main] Boot confirmed — normal operation");
                 state = State::IDLE;
                 break;
@@ -276,9 +278,7 @@ void loop() {
                 cmd.trim();
                 if (cmd == "confirm") {
                     OTAManager::confirm_boot();
-                    led_set(0, 255, 0);
-                    delay(500);
-                    led_set(0, 0, 0);
+                    led_blink_n(0, 255, 0, 1, 250);
                     Serial.println("[main] Boot confirmed via serial");
                     state = State::IDLE;
                     break;
@@ -309,24 +309,14 @@ void loop() {
 
             if (ok) {
                 // Success — blink green 3x then reboot
-                for (int i = 0; i < 3; i++) {
-                    led_set(0, 255, 0);
-                    delay(200);
-                    led_set(0, 0, 0);
-                    delay(200);
-                }
+                led_blink_n(0, 255, 0, 3, 200);
                 Serial.println("[main] OTA success — rebooting...");
                 delay(500);
                 ESP.restart();
             } else {
                 // Failure — blink red 3x, return to IDLE
                 Serial.printf("[main] OTA failed: %s\n", OTAManager::progress().error);
-                for (int i = 0; i < 3; i++) {
-                    led_set(255, 0, 0);
-                    delay(200);
-                    led_set(0, 0, 0);
-                    delay(200);
-                }
+                led_blink_n(255, 0, 0, 3, 200);
                 state = State::IDLE;
             }
             break;
