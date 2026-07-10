@@ -378,6 +378,17 @@ bool download_and_flash() {
         return false;
     }
 
+    // Set boot partition to the newly flashed OTA slot
+    const esp_partition_t* new_part = esp_ota_get_next_update_partition(nullptr);
+    if (new_part && esp_ota_set_boot_partition(new_part) == ESP_OK) {
+        Serial.printf("[ota] Boot partition → %s\n", new_part->label);
+    } else {
+        s_progress.state = State::FAILED;
+        s_progress.error = "Failed to set boot partition";
+        Serial.println("[ota] FAILED: Could not set boot partition");
+        return false;
+    }
+
     s_progress.state = State::SUCCESS;
     s_progress.percent = 100;
     s_update_pending = true;

@@ -107,6 +107,14 @@ void setup() {
     OTAManager::begin();
 
     // ── Boot confirmation (after OTA reboot) ────────
+    {
+        const esp_partition_t* running = esp_ota_get_running_partition();
+        esp_ota_img_states_t ota_state;
+        esp_ota_get_state_partition(running, &ota_state);
+        Serial.printf("[main] Running partition: %s, ota state=%d, subtype=%d\n",
+                      running ? running->label : "NULL",
+                      ota_state, running ? running->subtype : -1);
+    }
     if (OTAManager::is_pending_verify()) {
         int fail_count = OTAManager::boot_failure_count();
         Serial.printf("[main] OTA boot — pending verification (failures: %d/%d)\n", fail_count,
