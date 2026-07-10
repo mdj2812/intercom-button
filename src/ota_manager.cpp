@@ -466,9 +466,7 @@ void increment_failure() {
 
 void mark_invalid_and_rollback() {
     Serial.println("[ota] Marking image as invalid — rollback on next boot");
-    esp_ota_mark_app_invalid_rollback();
-    delay(500);
-    ESP.restart();
+    esp_ota_mark_app_invalid_rollback_and_reboot();
 }
 
 } // namespace OTAManager

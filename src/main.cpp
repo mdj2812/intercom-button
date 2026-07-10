@@ -124,7 +124,7 @@ void setup() {
         if (fail_count >= OTAManager::MAX_BOOT_FAILURES) {
             Serial.println("[main] Too many failures — marking image invalid");
             OTAManager::mark_invalid_and_rollback();
-            // mark_invalid_and_rollback() calls ESP.restart() internally
+            // mark_invalid_and_rollback() calls reboot internally
             return;
         }
 
