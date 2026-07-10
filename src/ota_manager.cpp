@@ -131,15 +131,15 @@ bool download_and_flash() {
             }
 
             if (sig_content_len == 64) {
+                // Read exactly 64 bytes — server with HTTP/1.0 closes quickly
                 size_t total = 0;
-                while (total < 64 && sig_client.connected()) {
-                    int avail = sig_client.available();
-                    if (avail > 0) {
-                        int r = sig_client.read(sig_buf + total, 64 - total);
-                        if (r > 0)
-                            total += r;
-                    }
-                    delay(1);
+                unsigned long read_start = millis();
+                while (total < 64 && (millis() - read_start) < 3000) {
+                    int r = sig_client.read(sig_buf + total, 64 - total);
+                    if (r > 0)
+                        total += r;
+                    else
+                        delay(5);
                 }
                 if (total == 64) {
                     have_signature = true;
