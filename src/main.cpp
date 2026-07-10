@@ -24,6 +24,7 @@
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
 #include <esp_ota_ops.h>
+#include <Preferences.h>
 
 // ── Globals ─────────────────────────────────────────
 static ButtonManager buttons;
