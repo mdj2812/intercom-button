@@ -1,0 +1,10 @@
+# Name,     Type, SubType,  Offset,   Size,      Flags
+# ── OTA partition table for 8MB flash (ESP32-S3) ──
+# Layout: factory (immutable fallback) + ota_0 + ota_1 + littlefs
+nvs,        data, nvs,      0x9000,   0x5000,
+otadata,    data, ota,      0xe000,   0x2000,
+factory,    app,  factory,  0x10000,  0x200000,
+ota_0,      app,  ota_0,    0x210000, 0x200000,
+ota_1,      app,  ota_1,    0x410000, 0x200000,
+spiffs,     data, spiffs,   0x610000, 0x1E0000,
+coredump,   data, coredump, 0x7F0000, 0x10000,

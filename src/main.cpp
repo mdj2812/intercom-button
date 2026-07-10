@@ -18,10 +18,14 @@
 #include "config.h"
 #include "config_manager.h"
 #include "http_uploader.h"
+#include "ota_manager.h"
 #include "room_target_store.h"
 #include "wifi_manager.h"
+
 #include <Arduino.h>
+#include <esp_ota_ops.h>
 #include <Adafruit_NeoPixel.h>
+#include <Preferences.h>
 
 // ── Globals ─────────────────────────────────────────
 static ButtonManager buttons;
@@ -32,7 +36,7 @@ static Adafruit_NeoPixel led(1, PIN_LED_WS2812, NEO_GRB + NEO_KHZ800);
 static const uint8_t* active_pins = BUTTON_PINS;
 static uint8_t active_pin_count = BUTTON_COUNT;
 
-enum class State { IDLE, RECORDING, UPLOADING };
+enum class State { IDLE, RECORDING, UPLOADING, CONFIRMING, OTA };
 static State state = State::IDLE;
 static unsigned long record_start_ms = 0;
 static const unsigned long MIN_RECORD_MS = 500;
@@ -40,17 +44,39 @@ static unsigned long MAX_RECORD_MS = 60000; // updated from config
 
 static uint8_t active_button_index = 0; // which button triggered recording
 static unsigned long upload_start_ms = 0;
+static unsigned long confirm_deadline_ms = 0; // boot confirmation timeout
 
-// ── LED helpers ─────────────────────────────────────
+// ── LED color constants ────────────────────────────────
 
-static void led_set(uint8_t r, uint8_t g, uint8_t b) {
-    led.setPixelColor(0, led.Color(r, g, b));
+struct LED {
+    uint8_t r, g, b;
+};
+constexpr LED C_OFF{0, 0, 0};
+constexpr LED C_GREEN{0, 255, 0};
+constexpr LED C_RED{255, 0, 0};
+constexpr LED C_BLUE{0, 0, 255};
+constexpr LED C_ORANGE{255, 128, 0};
+constexpr LED C_WHITE{255, 255, 255};
+
+// ── LED helpers ───────────────────────────────────────
+
+static void led_set(const LED& c) {
+    led.setPixelColor(0, led.Color(c.r, c.g, c.b));
     led.show();
 }
 
-static void led_blink(uint8_t r, uint8_t g, uint8_t b, unsigned long period_ms) {
+static void led_blink_n(const LED& c, int count, int interval_ms) {
+    for (int i = 0; i < count; i++) {
+        led_set(c);
+        delay(interval_ms);
+        led_set(C_OFF);
+        delay(interval_ms);
+    }
+}
+
+static void led_blink(const LED& c, unsigned long period_ms) {
     bool on = (millis() / (period_ms / 2)) % 2 == 0;
-    led_set(on ? r : 0, on ? g : 0, on ? b : 0);
+    led_set(on ? c : C_OFF);
 }
 
 // ── SETUP ───────────────────────────────────────────
@@ -61,7 +87,7 @@ void setup() {
     Serial.println("\n\n=== ESP32-S3 Intercom Button (Multi) ===");
 
     led.begin();
-    led_set(0, 0, 0);
+    led_set(C_OFF);
     led.setBrightness(32);
 
     // ── Load runtime config from LittleFS ───────────
@@ -96,9 +122,42 @@ void setup() {
     if (!recorder.begin(ConfigManager::sample_rate(), ConfigManager::max_record_secs())) {
         Serial.println("FATAL: AudioRecorder init failed");
         while (1) {
-            led_blink(255, 0, 0, 200);
+            led_blink(C_RED, 200);
             delay(10);
         }
+    }
+
+    // ── OTA manager ─────────────────────────────────
+    OTAManager::begin();
+
+    // ── Boot confirmation (after OTA reboot) ────────
+    {
+        const esp_partition_t* running = esp_ota_get_running_partition();
+        if (running && running->subtype == 0) { // factory subtype
+            Preferences prefs;
+            if (prefs.begin("ota", false)) {
+                prefs.putBool("pending", false);
+                prefs.putUInt("fail_count", 0);
+                prefs.end();
+                Serial.println("[main] Factory boot — cleared stale OTA flags");
+            }
+        }
+    }
+    if (OTAManager::is_pending_verify()) {
+        int fail_count = OTAManager::boot_failure_count();
+        Serial.printf("[main] OTA boot — pending verification (failures: %d/%d)\n", fail_count,
+                      OTAManager::MAX_BOOT_FAILURES);
+
+        if (fail_count >= OTAManager::MAX_BOOT_FAILURES) {
+            Serial.println("[main] Too many failures — marking image invalid");
+            OTAManager::mark_invalid_and_rollback();
+            // mark_invalid_and_rollback() calls reboot internally
+            return;
+        }
+
+        state = State::CONFIRMING;
+        confirm_deadline_ms = millis() + OTAManager::CONFIRM_TIMEOUT_SEC * 1000UL;
+        Serial.printf("[main] Confirm boot within %lu seconds (press any button)\n", OTAManager::CONFIRM_TIMEOUT_SEC);
     }
 
     Serial.println("Setup complete — ready.");
@@ -110,13 +169,29 @@ void loop() {
     bool wifi_ok = WiFiManager::update();
     auto event = buttons.poll();
 
+    // ── Serial commands (skip in CONFIRMING/OTA — they have their own handlers)
+    if (Serial.available() && state != State::CONFIRMING && state != State::OTA) {
+        String cmd = Serial.readStringUntil('\n');
+        cmd.trim();
+        if (cmd == "ota" && state == State::IDLE && wifi_ok) {
+            Serial.println("[main] OTA update triggered via serial");
+            state = State::OTA;
+        } else if (cmd == "reboot") {
+            Serial.println("[main] Rebooting...");
+            delay(100);
+            ESP.restart();
+        } else if (cmd.length() > 0) {
+            Serial.printf("[main] Unknown command: '%s' (try 'ota' or 'reboot')\n", cmd.c_str());
+        }
+    }
+
     switch (state) {
 
         case State::IDLE: {
             if (!wifi_ok) {
-                led_blink(255, 0, 0, 500);
+                led_blink(C_RED, 500);
             } else {
-                led_set(0, 255, 0);
+                led_set(C_GREEN);
             }
 
             // PTT triggers on PRESS (immediate) for responsive UX.
@@ -127,7 +202,7 @@ void loop() {
                 active_button_index = event.button_index;
                 recorder.start();
                 record_start_ms = millis();
-                led_set(0, 0, 255);
+                led_set(C_BLUE);
                 state = State::RECORDING;
                 Serial.printf("[main] Recording for GPIO%u...\n", active_pins[active_button_index]);
             }
@@ -135,7 +210,7 @@ void loop() {
         }
 
         case State::RECORDING: {
-            led_set(0, 0, 255);
+            led_set(C_BLUE);
             unsigned long elapsed = millis() - record_start_ms;
 
             if (elapsed >= MAX_RECORD_MS) {
@@ -147,7 +222,7 @@ void loop() {
             if (event.type == ButtonManager::EventType::PRESS && event.button_index != active_button_index) {
                 Serial.printf("[main] Busy — recording GPIO%u, ignoring GPIO%u\n", active_pins[active_button_index],
                               active_pins[event.button_index]);
-                led_set(255, 0, 0);
+                led_set(C_RED);
                 delay(150);
                 break;
             }
@@ -159,7 +234,7 @@ void loop() {
 
                 if (elapsed < MIN_RECORD_MS) {
                     Serial.println("[main] Too short — discarding");
-                    led_set(0, 255, 0);
+                    led_set(C_GREEN);
                     state = State::IDLE;
                     break;
                 }
@@ -173,7 +248,7 @@ void loop() {
         }
 
         case State::UPLOADING: {
-            led_blink(255, 255, 255, 100);
+            led_blink(C_WHITE, 100);
 
             uint8_t gpio = active_pins[active_button_index];
             std::string room = room_store.get_room(gpio);
@@ -184,14 +259,72 @@ void loop() {
             unsigned long upload_ms = millis() - upload_start_ms;
             Serial.printf("[main] Upload to %s %s (%lu ms)\n", room.c_str(), ok ? "OK" : "FAILED", upload_ms);
 
-            for (int i = 0; i < 4; i++) {
-                led_set(ok ? 0 : 255, ok ? 255 : 0, 0);
-                delay(125);
-                led_set(0, 0, 0);
-                delay(125);
-            }
+            led_blink_n(ok ? C_GREEN : C_RED, 4, 125);
 
             state = State::IDLE;
+            break;
+        }
+
+        case State::CONFIRMING: {
+            // Blink orange — fast blink for urgency
+            led_blink(C_ORANGE, 300);
+
+            // Button press = user confirms boot OK
+            if (event.type == ButtonManager::EventType::PRESS) {
+                OTAManager::confirm_boot();
+                led_blink_n(C_GREEN, 1, 250);
+                Serial.println("[main] Boot confirmed — normal operation");
+                state = State::IDLE;
+                break;
+            }
+
+            // Serial command confirm
+            if (Serial.available()) {
+                String cmd = Serial.readStringUntil('\n');
+                cmd.trim();
+                if (cmd == "confirm") {
+                    OTAManager::confirm_boot();
+                    led_blink_n(C_GREEN, 1, 250);
+                    Serial.println("[main] Boot confirmed via serial");
+                    state = State::IDLE;
+                    break;
+                }
+            }
+
+            // Timeout → rollback
+            if (millis() > confirm_deadline_ms) {
+                Serial.println("[main] Boot confirmation timeout — rolling back");
+                OTAManager::increment_failure();
+
+                int fail_count = OTAManager::boot_failure_count();
+                if (fail_count >= OTAManager::MAX_BOOT_FAILURES) {
+                    OTAManager::mark_invalid_and_rollback();
+                }
+                // Otherwise just restart — bootloader will retry same partition
+                led_set(C_RED);
+                delay(1000);
+                ESP.restart();
+            }
+            break;
+        }
+
+        case State::OTA: {
+            led_set(C_ORANGE); // orange = OTA in progress
+
+            bool ok = OTAManager::download_and_flash();
+
+            if (ok) {
+                // Success — blink green 3x then reboot
+                led_blink_n(C_GREEN, 3, 200);
+                Serial.println("[main] OTA success — rebooting...");
+                delay(500);
+                ESP.restart();
+            } else {
+                // Failure — blink red 3x, return to IDLE
+                Serial.printf("[main] OTA failed: %s\n", OTAManager::progress().error);
+                led_blink_n(C_RED, 3, 200);
+                state = State::IDLE;
+            }
             break;
         }
 
