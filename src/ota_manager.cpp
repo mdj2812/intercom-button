@@ -32,7 +32,7 @@ namespace OTAManager {
 // ── Internal state ───────────────────────────────────────
 
 static Progress s_progress;
-static char s_firmware_path[128] = "/firmware/esp32-intercom-button.bin";
+static char s_firmware_path[128] = "/esp32-intercom-button.bin";
 static bool s_update_pending = false;
 
 // ── Helpers ──────────────────────────────────────────────
