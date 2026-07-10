@@ -69,4 +69,10 @@ static constexpr int MAX_BOOT_FAILURES = 3;
 /** Seconds to wait for user confirmation before auto-rollback. */
 static constexpr unsigned long CONFIRM_TIMEOUT_SEC = 60;
 
+/** Increment the consecutive boot failure counter in NVS. */
+void increment_failure();
+
+/** Mark current OTA image as invalid and schedule rollback on next boot. */
+void mark_invalid_and_rollback();
+
 } // namespace OTAManager

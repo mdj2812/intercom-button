@@ -122,8 +122,10 @@ void setup() {
                       OTAManager::MAX_BOOT_FAILURES);
 
         if (fail_count >= OTAManager::MAX_BOOT_FAILURES) {
-            Serial.println("[main] Too many failures — rolling back");
-            ESP.restart();
+            Serial.println("[main] Too many failures — marking image invalid");
+            OTAManager::mark_invalid_and_rollback();
+            // mark_invalid_and_rollback() calls ESP.restart() internally
+            return;
         }
 
         state = State::CONFIRMING;
@@ -274,7 +276,13 @@ void loop() {
             // Timeout → rollback
             if (millis() > confirm_deadline_ms) {
                 Serial.println("[main] Boot confirmation timeout — rolling back");
-                // ESP32 bootloader handles actual rollback on next boot
+                OTAManager::increment_failure();
+
+                int fail_count = OTAManager::boot_failure_count();
+                if (fail_count >= OTAManager::MAX_BOOT_FAILURES) {
+                    OTAManager::mark_invalid_and_rollback();
+                }
+                // Otherwise just restart — bootloader will retry same partition
                 led_set(255, 0, 0);
                 delay(1000);
                 ESP.restart();
