@@ -83,6 +83,16 @@ bool download_and_flash() {
     s_progress = Progress{};
     s_update_pending = false;
 
+    // Grab the target OTA partition BEFORE Update.begin() claims it
+    const esp_partition_t* target_part = esp_ota_get_next_update_partition(nullptr);
+    if (!target_part) {
+        s_progress.state = State::FAILED;
+        s_progress.error = "No OTA partition available";
+        Serial.println("[ota] FAILED: No OTA partition found");
+        return false;
+    }
+    Serial.printf("[ota] Target partition: %s (0x%lx)\n", target_part->label, target_part->address);
+
     const char* host = ConfigManager::server_host();
     uint16_t port = ConfigManager::server_port();
 
@@ -372,15 +382,14 @@ bool download_and_flash() {
 
     // ── Set boot partition BEFORE finalizing flash ──────────
     // Per ESP-IDF docs: set boot partition, THEN end update.
-    const esp_partition_t* new_part = esp_ota_get_next_update_partition(nullptr);
-    if (!new_part || esp_ota_set_boot_partition(new_part) != ESP_OK) {
+    if (esp_ota_set_boot_partition(target_part) != ESP_OK) {
         s_progress.state = State::FAILED;
         s_progress.error = "Failed to set boot partition";
         Serial.println("[ota] FAILED: Could not set boot partition");
         Update.abort();
         return false;
     }
-    Serial.printf("[ota] Boot partition → %s\n", new_part->label);
+    Serial.printf("[ota] Boot partition → %s\n", target_part->label);
 
     // ── Finalize flash ────────────────────────────────────
     if (!Update.end()) {
