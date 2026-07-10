@@ -75,8 +75,12 @@ def sign_firmware(firmware_path: str, key_path: str, sig_path: str) -> None:
     pos += 1
     s_bytes = sig_der[pos:pos + s_len]
     
-    # Pad r, s to 32 bytes each
+    # Truncate leading zeros if > 32 bytes, pad if < 32 bytes
+    if len(r_bytes) > 32:
+        r_bytes = r_bytes[len(r_bytes) - 32:]
     r_padded = b'\x00' * (32 - len(r_bytes)) + r_bytes
+    if len(s_bytes) > 32:
+        s_bytes = s_bytes[len(s_bytes) - 32:]
     s_padded = b'\x00' * (32 - len(s_bytes)) + s_bytes
     
     raw_sig = r_padded + s_padded
