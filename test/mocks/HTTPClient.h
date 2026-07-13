@@ -1,9 +1,9 @@
 #pragma once
+#include "WString.h"
 #include <Arduino.h>
 #include <cstdint>
-#include <cstring>
 #include <cstdio>
-#include "WString.h"
+#include <cstring>
 
 // ── HTTP status ─────────────────────────────────────
 #define HTTP_CODE_OK 200
@@ -12,9 +12,10 @@
 struct HTTPMockState {
     int response_code = 200;
     std::string response_body = R"({"ok":true})";
-    int connect_error = 0;          // < 0 = connection error (timeout, reset)
+    int connect_error = 0; // < 0 = connection error (timeout, reset)
     std::string last_url;
     std::string last_content_type;
+    std::string last_auth_header; // Authorization header value (if set)
     size_t last_body_size = 0;
     int post_call_count = 0;
 };
@@ -43,14 +44,16 @@ public:
     void addHeader(const char* name, const char* value) {
         if (name && strcmp(name, "Content-Type") == 0)
             _http_mock.last_content_type = value ? value : "";
+        if (name && strcmp(name, "Authorization") == 0)
+            _http_mock.last_auth_header = value ? value : "";
     }
 
     void setTimeout(uint32_t ms) {
-        (void)ms;
+        (void) ms;
     }
 
     int POST(uint8_t* data, size_t len) {
-        (void)data;
+        (void) data;
         _http_mock.last_body_size = len;
         _http_mock.post_call_count++;
 

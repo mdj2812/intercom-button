@@ -6,15 +6,16 @@
 static const char* TAG = "upload";
 
 bool HTTPUploader::upload(const uint8_t* data, size_t size, const char* server_host, uint16_t server_port,
-                          const char* room_target) {
+                          const char* room_target, const char* ha_token) {
     if (!data || size == 0) {
         Serial.printf("[%s] No data to upload\n", TAG);
         return false;
     }
 
-    // std::ostringstream — type-safe URL construction, no printf format-string issues
+    // std::ostringstream — type-safe URL construction, no printf format-string issues.
+    // Unified path works with both Docker (Flask alias) and HA integration (HomeAssistantView).
     std::ostringstream oss;
-    oss << "http://" << server_host << ":" << server_port << "/record?target=" << room_target;
+    oss << "http://" << server_host << ":" << server_port << "/api/home_intercom/record?target=" << room_target;
     std::string url_str = oss.str();
     const char* url = url_str.c_str();
 
@@ -23,6 +24,11 @@ bool HTTPUploader::upload(const uint8_t* data, size_t size, const char* server_h
         HTTPClient http;
         http.begin(url);
         http.addHeader("Content-Type", "audio/wav");
+        if (ha_token && ha_token[0] != '\0') {
+            String auth = "Bearer ";
+            auth += ha_token;
+            http.addHeader("Authorization", auth.c_str());
+        }
         http.setTimeout(60000); // 60 seconds (Arduino-ESP32 v3: ms, not s)
 
         Serial.printf("[%s] POST %s (%u bytes) attempt %d/3\n", TAG, url, size, attempt);

@@ -254,7 +254,7 @@ void loop() {
             std::string room = room_store.get_room(gpio);
 
             bool ok = HTTPUploader::upload(recorder.data(), recorder.total_bytes(), ConfigManager::server_host(),
-                                           ConfigManager::server_port(), room.c_str());
+                                           ConfigManager::server_port(), room.c_str(), ConfigManager::ha_token());
 
             unsigned long upload_ms = millis() - upload_start_ms;
             Serial.printf("[main] Upload to %s %s (%lu ms)\n", room.c_str(), ok ? "OK" : "FAILED", upload_ms);
