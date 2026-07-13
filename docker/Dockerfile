@@ -8,10 +8,6 @@
 # Or use dev.sh which handles this automatically.
 FROM ubuntu:22.04
 
-# ── Use TUNA mirrors ────────────────────────────────
-RUN sed -i 's|http://archive.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list && \
-    sed -i 's|http://security.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
-
 # ── System dependencies ─────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv python3-dev \
@@ -27,9 +23,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     rm -rf /var/lib/apt/lists/*
 
 # ── PlatformIO Core ─────────────────────────────────
-RUN pip3 install --no-cache-dir \
-    -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple \
-    platformio
+RUN pip3 install --no-cache-dir platformio
 
 # ── Pre-install ESP32 platform metadata ─────────────
 RUN pio platform install "espressif32"
