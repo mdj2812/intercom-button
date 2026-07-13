@@ -57,7 +57,7 @@ jobs:
           pip install platformio
           pio platform install espressif32
           pio platform install native
-          # Trigger toolchain download for the target env
+          # Trigger ESP32-S3 build to download compiler + framework (~1.5GB)
           pio run -e esp32-s3-devkitc-1
 
       - name: Build and push Docker image

@@ -32,23 +32,15 @@ RUN pio platform install "espressif32"
 RUN pio platform install "native"
 
 # ── Copy toolchains + framework from host ───────────
-# These total ~1.8GB. Host must have them pre-downloaded
-# (run `pio run` on the host first).
-COPY --from=pio-cache packages/toolchain-xtensa-esp32s3   /root/.platformio/packages/toolchain-xtensa-esp32s3
-COPY --from=pio-cache packages/toolchain-riscv32-esp      /root/.platformio/packages/toolchain-riscv32-esp
-COPY --from=pio-cache packages/framework-arduinoespressif32 /root/.platformio/packages/framework-arduinoespressif32
-COPY --from=pio-cache packages/tool-esptoolpy              /root/.platformio/packages/tool-esptoolpy
-COPY --from=pio-cache packages/tool-openocd-esp32           /root/.platformio/packages/tool-openocd-esp32
-COPY --from=pio-cache packages/tool-cppcheck               /root/.platformio/packages/tool-cppcheck
-COPY --from=pio-cache packages/tool-scons                  /root/.platformio/packages/tool-scons
-COPY --from=pio-cache packages/tool-mkspiffs               /root/.platformio/packages/tool-mkspiffs
-COPY --from=pio-cache packages/tool-mklittlefs             /root/.platformio/packages/tool-mklittlefs
-COPY --from=pio-cache packages/tool-mkfatfs                /root/.platformio/packages/tool-mkfatfs
+# Copies whatever packages pio run downloaded — GitHub Actions
+# runner pre-downloads them in the workflow, local dev via pio run.
+# Single glob copy avoids failing on missing optional packages
+# (mkspiffs, openocd, etc.) that pio run doesn't always pull.
+COPY --from=pio-cache packages/ /root/.platformio/packages/
 
 # ── Verify toolchains ────────────────────────────────
 RUN /root/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-gcc --version && \
-    /root/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-gcc --version && \
-    echo "All toolchains OK"
+    echo "Toolchain OK"
 
 # ── Workspace ───────────────────────────────────────
 WORKDIR /workspace
