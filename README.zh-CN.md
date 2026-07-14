@@ -30,15 +30,20 @@ MAX9814 增益：将 GAIN 焊盘接地获得 50dB（桌面使用推荐）。
 {
     "wifi_ssid": "你的WiFi",
     "wifi_password": "你的密码",
-    "server_host": "192.168.99.10",
-    "server_port": 8764,
+    "server_host": "192.168.99.4",
+    "server_port": 8123,
+    "ha_token": "",
     "room": "study",
     "sample_rate": 16000,
     "max_record_secs": 60
 }
 ```
 
-房间键值（来自 `rooms.json`）：`study`、`living`、`cinema`、`bedroom`，或 `all` 广播所有房间。
+| 字段 | 说明 |
+|------|------|
+| `server_host` | Home Assistant 的 IP（Docker 模式填 Docker 主机 IP） |
+| `server_port` | HA 集成用 `8123`，Docker 旧模式用 `8764` |
+| `ha_token` | HA 长期访问令牌。Docker 模式**留空**即可。HA 模式下，请[创建受限令牌](https://www.home-assistant.io/docs/authentication/#your-account-profile)，仅给最小权限——**不要用管理员令牌**。令牌以明文存储在 ESP32 闪存中；如果设备物理丢失，可在 HA 后台立即吊销。
 
 复制 `data/config.example.json` 为 `data/config.json` 并填入你的设置。`data/config.json` 已加入 `.gitignore`——凭证不会泄露。
 
@@ -256,7 +261,7 @@ make monitor
 
 ```text
 === ESP32-S3 Intercom Button ===
-[cfg] Loaded: room=study server=192.168.99.10:8764 wifi=MyWiFi
+[cfg] Loaded: room=study server=192.168.99.4:8123 wifi=MyWiFi
 [wifi] Connecting to MyWiFi...
 [wifi] Connected
 [audio] Buffer: 960000 samples (60 sec), PSRAM free: 7654 KB
@@ -264,7 +269,7 @@ make monitor
 [main] Setup complete — ready.
 [main] Recording...
 [audio] Stopped — 48000 samples (3.0s)
-[upload] POST http://192.168.99.10:8764/record?target=study (96044 bytes) attempt 1/3
+[upload] POST http://192.168.99.4:8123/api/home_intercom/record?target=study (96044 bytes) attempt 1/3
 [upload] OK: {"ok":true,"rooms_sent":1,...}
 [main] Upload OK (1725 ms)
 ```
