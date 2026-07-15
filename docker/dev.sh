@@ -32,20 +32,24 @@ done
 # ── Acquire image ───────────────────────────────────
 HAVE_IMAGE=false
 if ! $FORCE_BUILD; then
-    # Try local first (by short name), then pull from registry
+    # Try local first, then pull from registry
     if docker image inspect "$IMAGE_NAME" &>/dev/null; then
         docker tag "$IMAGE_NAME" "$IMAGE" 2>/dev/null || true
         HAVE_IMAGE=true
     elif docker image inspect "$IMAGE" &>/dev/null; then
         HAVE_IMAGE=true
-    elif docker pull "$IMAGE" 2>/dev/null; then
+    elif docker pull "$IMAGE"; then
         docker tag "$IMAGE" "$IMAGE_NAME"
         HAVE_IMAGE=true
         echo "=== Pulled $IMAGE ==="
+    else
+        echo "=== Image not found: $IMAGE ===" >&2
+        echo "Use -b to build locally, or wait for CI to publish to ghcr.io." >&2
+        exit 1
     fi
 fi
 
-if ! $HAVE_IMAGE; then
+if $FORCE_BUILD; then
     echo "=== Building $IMAGE (~3GB) ==="
     docker build \
         --build-context "pio-cache=$HOME/.platformio" \
