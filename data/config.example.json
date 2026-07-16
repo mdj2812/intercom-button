@@ -8,12 +8,6 @@
     "ha_token": "",
     "sample_rate": 16000,
     "max_record_secs": 60,
-    "pins": [
-        4,
-        5,
-        12,
-        13
-    ],
     "buttons": {
         "4": "study",
         "5": "living",
