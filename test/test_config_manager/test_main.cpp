@@ -9,6 +9,9 @@
 #include <LittleFS.h>
 #include <unity.h>
 
+void setUp() {}
+void tearDown() {}
+
 static void inject_and_load(const char* json) {
     LittleFS.reset();
     LittleFS.begin(true);
@@ -21,6 +24,7 @@ void test_full_config() {
     inject_and_load(R"({
         "wifi_ssid": "MyWiFi",
         "wifi_password": "pass",
+        "server_scheme": "https",
         "server_host": "10.0.0.1",
         "server_port": 9999,
         "room": "study",
@@ -30,13 +34,23 @@ void test_full_config() {
 
     TEST_ASSERT_EQUAL_STRING("MyWiFi", ConfigManager::wifi_ssid());
     TEST_ASSERT_EQUAL_STRING("study", ConfigManager::room_target());
+    TEST_ASSERT_EQUAL_STRING("https", ConfigManager::server_scheme());
     TEST_ASSERT_EQUAL_STRING("10.0.0.1", ConfigManager::server_host());
     TEST_ASSERT_EQUAL(9999, ConfigManager::server_port());
     TEST_ASSERT_EQUAL(8000, ConfigManager::sample_rate());
     TEST_ASSERT_EQUAL(30, ConfigManager::max_record_secs());
 }
 
-// ── Test 2: Partial config — only keys in JSON change ──
+// ── Test 2: Scheme is normalized and invalid values are ignored ──
+void test_server_scheme_validation() {
+    inject_and_load(R"({"server_scheme": "HTTPS"})");
+    TEST_ASSERT_EQUAL_STRING("https", ConfigManager::server_scheme());
+
+    inject_and_load(R"({"server_scheme": "ftp"})");
+    TEST_ASSERT_EQUAL_STRING("https", ConfigManager::server_scheme());
+}
+
+// ── Test 3: Partial config — only keys in JSON change ──
 void test_partial_config_only_overwrites_present_keys() {
     // First inject full config
     inject_and_load(R"({
@@ -54,7 +68,7 @@ void test_partial_config_only_overwrites_present_keys() {
     TEST_ASSERT_EQUAL_STRING("192.168.1.1", ConfigManager::server_host());
 }
 
-// ── Test 3: Invalid JSON — previous values keep ─────
+// ── Test 4: Invalid JSON — previous values keep ─────
 void test_invalid_json_keeps_previous_values() {
     // Inject valid config
     inject_and_load(R"({"room": "cinema", "wifi_ssid": "StableWiFi"})");
@@ -69,7 +83,7 @@ void test_invalid_json_keeps_previous_values() {
     TEST_ASSERT_EQUAL_STRING("StableWiFi", ConfigManager::wifi_ssid());
 }
 
-// ── Test 4: Missing file — keeps previous values ─────
+// ── Test 5: Missing file — keeps previous values ─────
 void test_missing_file_keeps_prior_state() {
     // Inject first
     inject_and_load(R"({"room": "garage", "sample_rate": 22050})");
@@ -87,6 +101,7 @@ void test_missing_file_keeps_prior_state() {
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_full_config);
+    RUN_TEST(test_server_scheme_validation);
     RUN_TEST(test_partial_config_only_overwrites_present_keys);
     RUN_TEST(test_invalid_json_keeps_previous_values);
     RUN_TEST(test_missing_file_keeps_prior_state);

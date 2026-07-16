@@ -31,6 +31,7 @@ The same firmware binary works for all rooms — just upload a different config 
 {
     "wifi_ssid": "your_wifi",
     "wifi_password": "your_password",
+    "server_scheme": "http",
     "server_host": "192.168.99.4",
     "server_port": 8123,
     "ha_token": "",
@@ -42,11 +43,16 @@ The same firmware binary works for all rooms — just upload a different config 
 
 | Field | Description |
 |-------|-------------|
+| `server_scheme` | `http` for a trusted LAN; `https` for remote HA. HTTPS traffic is encrypted, but this firmware currently does not verify the server certificate. |
 | `server_host` | Home Assistant IP (or Docker host for legacy mode) |
 | `server_port` | `8123` for HA integration, `8764` for legacy Docker |
 | `ha_token` | HA Long-Lived Access Token. **Leave empty** for Docker mode. For HA mode, [create a restricted token](https://www.home-assistant.io/docs/authentication/#your-account-profile) with minimal permissions — never use your admin token. The token is stored in plaintext on the ESP32 flash; if the device is physically compromised, revoke it from the HA UI. |
 
 Copy `data/config.example.json` to `data/config.json` and fill in your settings. `data/config.json` is gitignored — credentials stay local.
+
+When `ha_token` is set, uploads use the HA-authenticated
+`/api/home_intercom/device/record` endpoint. Without a token, uploads continue to use the legacy
+Docker-compatible `/api/home_intercom/record` endpoint.
 
 **Multi-button setup**: flash firmware once, then for each device edit `data/config.json` (change `room`) and run `pio run -e esp32-s3-devkitc-1 -t uploadfs`.
 
@@ -264,7 +270,7 @@ The firmware logs every state transition:
 
 ```
 === ESP32-S3 Intercom Button ===
-[cfg] Loaded: room=study server=192.168.99.4:8123 wifi=MyWiFi
+[cfg] Loaded: room=study server=https://ha.example.com:443 wifi=MyWiFi
 [wifi] Connecting to MyWiFi...
 [wifi] Connected
 [audio] Buffer: 960000 samples (60 sec), PSRAM free: 7654 KB
@@ -272,7 +278,7 @@ The firmware logs every state transition:
 [main] Setup complete — ready.
 [main] Recording...
 [audio] Stopped — 48000 samples (3.0s)
-[upload] POST http://192.168.99.4:8123/api/home_intercom/record?target=study (96044 bytes) attempt 1/3
+[upload] POST https://ha.example.com:443/api/home_intercom/device/record?target=study (96044 bytes) attempt 1/3
 [upload] OK: {"ok":true,"rooms_sent":1,...}
 [main] Upload OK (1725 ms)
 ```

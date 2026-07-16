@@ -36,7 +36,8 @@ inline void mock_http_set_error(int error_code) {
 // ── HTTPClient class ────────────────────────────────
 class HTTPClient {
 public:
-    bool begin(const char* url) {
+    template <typename Client>
+    bool begin(Client&, const char* url) {
         _http_mock.last_url = url ? url : "";
         return true;
     }

@@ -14,6 +14,8 @@
 #define WIFI_STA 1
 #define WIFI_AP  2
 
+class WiFiClient {};
+
 // ── Mockable WiFi state ─────────────────────────────
 struct WiFiState {
     int status = WL_DISCONNECTED;

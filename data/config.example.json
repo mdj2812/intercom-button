@@ -1,7 +1,8 @@
 {
-    "_comment_buttons": "pins → which GPIOs to initialize as button inputs. buttons → per-pin room target defaults. ha_token → Home Assistant Long-Lived Access Token. Empty = no auth (Docker mode).",
+    "_comment_buttons": "pins → which GPIOs to initialize as button inputs. buttons → per-pin room target defaults. ha_token → Home Assistant Long-Lived Access Token. Empty = no auth (Docker mode). HTTPS encrypts traffic but currently does not verify the server certificate.",
     "wifi_ssid": "your_wifi_ssid",
     "wifi_password": "your_wifi_password",
+    "server_scheme": "http",
     "server_host": "192.168.99.4",
     "server_port": 8123,
     "ha_token": "",

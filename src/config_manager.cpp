@@ -10,6 +10,7 @@ static const char* TAG = "cfg";
 // JSON key constants
 static constexpr const char* KEY_WIFI_SSID = "wifi_ssid";
 static constexpr const char* KEY_WIFI_PASSWORD = "wifi_password";
+static constexpr const char* KEY_SERVER_SCHEME = "server_scheme";
 static constexpr const char* KEY_SERVER_HOST = "server_host";
 static constexpr const char* KEY_SERVER_PORT = "server_port";
 static constexpr const char* KEY_ROOM = "room";
@@ -28,6 +29,7 @@ static constexpr size_t JSON_DOC_SIZE = JSON_BASE + MAX_BUTTONS * JSON_PER_BTN; 
 struct Config {
     String wifi_ssid = "your_wifi_ssid";
     String wifi_password = "your_wifi_password";
+    String server_scheme = "http";
     String server_host = "192.168.99.10";
     uint16_t server_port = 8764;
     String room = "study";
@@ -75,6 +77,16 @@ bool ConfigManager::begin() {
         cfg.wifi_ssid = doc[KEY_WIFI_SSID].as<String>();
     if (doc.containsKey(KEY_WIFI_PASSWORD))
         cfg.wifi_password = doc[KEY_WIFI_PASSWORD].as<String>();
+    if (doc.containsKey(KEY_SERVER_SCHEME)) {
+        String scheme = doc[KEY_SERVER_SCHEME].as<String>();
+        scheme.toLowerCase();
+        if (scheme == "http" || scheme == "https") {
+            cfg.server_scheme = scheme;
+        } else {
+            Serial.printf("[%s] WARNING: unsupported server_scheme '%s' — keeping %s\n", TAG, scheme.c_str(),
+                          cfg.server_scheme.c_str());
+        }
+    }
     if (doc.containsKey(KEY_SERVER_HOST))
         cfg.server_host = doc[KEY_SERVER_HOST].as<String>();
     if (doc.containsKey(KEY_SERVER_PORT))
@@ -117,8 +129,9 @@ bool ConfigManager::begin() {
         Serial.printf("[%s] WARNING: pins count (%u) != buttons count (%u)\n", TAG, cfg.pin_count, cfg.button_count);
     }
 
-    Serial.printf("[%s] Loaded: room=%s server=%s:%u wifi=%s buttons=%u pins=%u\n", TAG, cfg.room.c_str(),
-                  cfg.server_host.c_str(), cfg.server_port, cfg.wifi_ssid.c_str(), cfg.button_count);
+    Serial.printf("[%s] Loaded: room=%s server=%s://%s:%u wifi=%s buttons=%u pins=%u\n", TAG, cfg.room.c_str(),
+                  cfg.server_scheme.c_str(), cfg.server_host.c_str(), cfg.server_port, cfg.wifi_ssid.c_str(),
+                  cfg.button_count);
     return true;
 }
 
@@ -129,6 +142,9 @@ const char* ConfigManager::wifi_ssid() {
 }
 const char* ConfigManager::wifi_password() {
     return cfg.wifi_password.c_str();
+}
+const char* ConfigManager::server_scheme() {
+    return cfg.server_scheme.c_str();
 }
 const char* ConfigManager::server_host() {
     return cfg.server_host.c_str();
