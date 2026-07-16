@@ -1,8 +1,9 @@
 name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
@@ -36,9 +37,11 @@ jobs:
           cp .pio/build/esp32-s3-devkitc-1/firmware.bin release/intercom-button-${{ github.ref_name }}.bin
           pio run -e esp32-s3-devkitc-1 -t size | tee release/size.txt
 
-      - name: Upload binaries to release
+      - name: Create release and upload assets
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ github.ref_name }}
+          body_path: CHANGELOG.md
           files: |
             release/intercom-button-${{ github.ref_name }}.bin
             release/size.txt
