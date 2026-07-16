@@ -27,13 +27,13 @@ void test_full_config() {
         "server_scheme": "https",
         "server_host": "10.0.0.1",
         "server_port": 9999,
-        "room": "study",
+        "ha_token": "test-token-abc",
         "sample_rate": 8000,
         "max_record_secs": 30
     })");
 
     TEST_ASSERT_EQUAL_STRING("MyWiFi", ConfigManager::wifi_ssid());
-    TEST_ASSERT_EQUAL_STRING("study", ConfigManager::room_target());
+    TEST_ASSERT_EQUAL_STRING("test-token-abc", ConfigManager::ha_token());
     TEST_ASSERT_EQUAL_STRING("https", ConfigManager::server_scheme());
     TEST_ASSERT_EQUAL_STRING("10.0.0.1", ConfigManager::server_host());
     TEST_ASSERT_EQUAL(9999, ConfigManager::server_port());
@@ -56,14 +56,14 @@ void test_partial_config_only_overwrites_present_keys() {
     inject_and_load(R"({
         "wifi_ssid": "FullWiFi",
         "server_host": "192.168.1.1",
-        "room": "living"
+        "ha_token": "old-token"
     })");
 
-    // Now inject partial config — only room changes
-    inject_and_load(R"({"room": "bedroom"})");
+    // Now inject partial config — only ha_token changes
+    inject_and_load(R"({"ha_token": "new-token"})");
 
-    // room changed, wifi_ssid and server_host retained from previous
-    TEST_ASSERT_EQUAL_STRING("bedroom", ConfigManager::room_target());
+    // ha_token changed, wifi_ssid and server_host retained from previous
+    TEST_ASSERT_EQUAL_STRING("new-token", ConfigManager::ha_token());
     TEST_ASSERT_EQUAL_STRING("FullWiFi", ConfigManager::wifi_ssid());
     TEST_ASSERT_EQUAL_STRING("192.168.1.1", ConfigManager::server_host());
 }
@@ -71,7 +71,7 @@ void test_partial_config_only_overwrites_present_keys() {
 // ── Test 4: Invalid JSON — previous values keep ─────
 void test_invalid_json_keeps_previous_values() {
     // Inject valid config
-    inject_and_load(R"({"room": "cinema", "wifi_ssid": "StableWiFi"})");
+    inject_and_load(R"({"ha_token": "cinema-token", "wifi_ssid": "StableWiFi"})");
 
     // Then broken JSON — begin() returns false, cfg unchanged
     LittleFS.reset();
@@ -79,14 +79,14 @@ void test_invalid_json_keeps_previous_values() {
     LittleFS.inject("/config.json", "{broken!!");
     ConfigManager::begin();
 
-    TEST_ASSERT_EQUAL_STRING("cinema", ConfigManager::room_target());
+    TEST_ASSERT_EQUAL_STRING("cinema-token", ConfigManager::ha_token());
     TEST_ASSERT_EQUAL_STRING("StableWiFi", ConfigManager::wifi_ssid());
 }
 
 // ── Test 5: Missing file — keeps previous values ─────
 void test_missing_file_keeps_prior_state() {
     // Inject first
-    inject_and_load(R"({"room": "garage", "sample_rate": 22050})");
+    inject_and_load(R"({"ha_token": "garage-token", "sample_rate": 22050})");
 
     // Then remove file
     LittleFS.reset();
@@ -94,7 +94,7 @@ void test_missing_file_keeps_prior_state() {
     ConfigManager::begin(); // file not found
 
     // Previous state persists (begin() returns early, no reset)
-    TEST_ASSERT_EQUAL_STRING("garage", ConfigManager::room_target());
+    TEST_ASSERT_EQUAL_STRING("garage-token", ConfigManager::ha_token());
     TEST_ASSERT_EQUAL(22050, ConfigManager::sample_rate());
 }
 
