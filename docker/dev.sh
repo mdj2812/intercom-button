@@ -30,17 +30,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ── Acquire image ───────────────────────────────────
-HAVE_IMAGE=false
 if ! $FORCE_BUILD; then
     # Try local first, then pull from registry
     if docker image inspect "$IMAGE_NAME" &>/dev/null; then
         docker tag "$IMAGE_NAME" "$IMAGE" 2>/dev/null || true
-        HAVE_IMAGE=true
     elif docker image inspect "$IMAGE" &>/dev/null; then
-        HAVE_IMAGE=true
+        :   # already have it
     elif docker pull "$IMAGE"; then
         docker tag "$IMAGE" "$IMAGE_NAME"
-        HAVE_IMAGE=true
         echo "=== Pulled $IMAGE ==="
     else
         echo "=== Image not found: $IMAGE ===" >&2
