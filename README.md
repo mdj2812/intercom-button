@@ -35,7 +35,6 @@ The same firmware binary works for all rooms — just upload a different config 
     "server_host": "192.168.99.4",
     "server_port": 8123,
     "ha_token": "",
-    "room": "study",
     "sample_rate": 16000,
     "max_record_secs": 60
 }

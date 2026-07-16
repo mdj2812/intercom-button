@@ -34,7 +34,6 @@ MAX9814 增益：将 GAIN 焊盘接地获得 50dB（桌面使用推荐）。
     "server_host": "192.168.99.4",
     "server_port": 8123,
     "ha_token": "",
-    "room": "study",
     "sample_rate": 16000,
     "max_record_secs": 60
 }
