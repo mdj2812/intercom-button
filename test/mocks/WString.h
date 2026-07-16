@@ -2,6 +2,7 @@
 #include <string>
 #include <cstdio>
 #include <cstdarg>
+#include <cctype>
 
 /// Minimal Arduino String mock — wraps std::string.
 class String {
@@ -21,6 +22,10 @@ public:
     }
     bool operator==(const String& o) const { return _s == o._s; }
     bool operator!=(const String& o) const { return _s != o._s; }
+    void toLowerCase() {
+        for (char& c : _s)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
 
     String& operator=(const char* s) {
         _s = s ? s : "";

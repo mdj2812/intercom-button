@@ -10,13 +10,13 @@ static const char* TAG = "cfg";
 // JSON key constants
 static constexpr const char* KEY_WIFI_SSID = "wifi_ssid";
 static constexpr const char* KEY_WIFI_PASSWORD = "wifi_password";
+static constexpr const char* KEY_SERVER_SCHEME = "server_scheme";
 static constexpr const char* KEY_SERVER_HOST = "server_host";
 static constexpr const char* KEY_SERVER_PORT = "server_port";
-static constexpr const char* KEY_ROOM = "room";
 static constexpr const char* KEY_SAMPLE_RATE = "sample_rate";
 static constexpr const char* KEY_MAX_RECORD_SECS = "max_record_secs";
-static constexpr const char* KEY_PINS = "pins";
 static constexpr const char* KEY_BUTTONS = "buttons";
+static constexpr const char* KEY_HA_TOKEN = "ha_token";
 
 // JSON document size: base fields + MAX_BUTTONS × (pins entry + buttons entry + overhead)
 static constexpr size_t JSON_BASE = 256;   // wifi, server, room, audio fields
@@ -27,9 +27,9 @@ static constexpr size_t JSON_DOC_SIZE = JSON_BASE + MAX_BUTTONS * JSON_PER_BTN; 
 struct Config {
     String wifi_ssid = "your_wifi_ssid";
     String wifi_password = "your_wifi_password";
-    String server_host = "192.168.99.10";
-    uint16_t server_port = 8764;
-    String room = "study";
+    String server_scheme = "http";
+    String server_host = "192.168.99.4";
+    uint16_t server_port = 8123;
     uint32_t sample_rate = 16000;
     uint32_t max_secs = 60;
 
@@ -38,9 +38,8 @@ struct Config {
     String button_rooms[MAX_BUTTONS];
     uint8_t button_count = 0;
 
-    // Config-file pin list from "pins" field
-    uint8_t pins[MAX_BUTTONS] = {};
-    uint8_t pin_count = 0;
+    // HA auth token (empty = no auth header)
+    String ha_token;
 };
 static Config cfg;
 
@@ -71,27 +70,26 @@ bool ConfigManager::begin() {
         cfg.wifi_ssid = doc[KEY_WIFI_SSID].as<String>();
     if (doc.containsKey(KEY_WIFI_PASSWORD))
         cfg.wifi_password = doc[KEY_WIFI_PASSWORD].as<String>();
+    if (doc.containsKey(KEY_SERVER_SCHEME)) {
+        String scheme = doc[KEY_SERVER_SCHEME].as<String>();
+        scheme.toLowerCase();
+        if (scheme == "http" || scheme == "https") {
+            cfg.server_scheme = scheme;
+        } else {
+            Serial.printf("[%s] WARNING: unsupported server_scheme '%s' — keeping %s\n", TAG, scheme.c_str(),
+                          cfg.server_scheme.c_str());
+        }
+    }
     if (doc.containsKey(KEY_SERVER_HOST))
         cfg.server_host = doc[KEY_SERVER_HOST].as<String>();
     if (doc.containsKey(KEY_SERVER_PORT))
         cfg.server_port = doc[KEY_SERVER_PORT].as<uint16_t>();
-    if (doc.containsKey(KEY_ROOM))
-        cfg.room = doc[KEY_ROOM].as<String>();
     if (doc.containsKey(KEY_SAMPLE_RATE))
         cfg.sample_rate = doc[KEY_SAMPLE_RATE].as<uint32_t>();
     if (doc.containsKey(KEY_MAX_RECORD_SECS))
         cfg.max_secs = doc[KEY_MAX_RECORD_SECS].as<uint32_t>();
-
-    // ── Parse button pin list ──────────────────────
-    if (doc.containsKey(KEY_PINS)) {
-        JsonArray pinsArr = doc[KEY_PINS].as<JsonArray>();
-        cfg.pin_count = 0;
-        for (JsonVariant v : pinsArr) {
-            if (cfg.pin_count >= MAX_BUTTONS)
-                break;
-            cfg.pins[cfg.pin_count++] = v.as<uint8_t>();
-        }
-    }
+    if (doc.containsKey(KEY_HA_TOKEN))
+        cfg.ha_token = doc[KEY_HA_TOKEN].as<String>();
 
     // ── Parse per-button room mappings ────────────
     if (doc.containsKey(KEY_BUTTONS)) {
@@ -106,12 +104,7 @@ bool ConfigManager::begin() {
         }
     }
 
-    // ── Validate: warn if pins/buttons sizes mismatch ─
-    if (cfg.pin_count > 0 && cfg.button_count > 0 && cfg.pin_count != cfg.button_count) {
-        Serial.printf("[%s] WARNING: pins count (%u) != buttons count (%u)\n", TAG, cfg.pin_count, cfg.button_count);
-    }
-
-    Serial.printf("[%s] Loaded: room=%s server=%s:%u wifi=%s buttons=%u pins=%u\n", TAG, cfg.room.c_str(),
+    Serial.printf("[%s] Loaded: server=%s://%s:%u wifi=%s buttons=%u\n", TAG, cfg.server_scheme.c_str(),
                   cfg.server_host.c_str(), cfg.server_port, cfg.wifi_ssid.c_str(), cfg.button_count);
     return true;
 }
@@ -124,14 +117,17 @@ const char* ConfigManager::wifi_ssid() {
 const char* ConfigManager::wifi_password() {
     return cfg.wifi_password.c_str();
 }
+const char* ConfigManager::server_scheme() {
+    return cfg.server_scheme.c_str();
+}
 const char* ConfigManager::server_host() {
     return cfg.server_host.c_str();
 }
 uint16_t ConfigManager::server_port() {
     return cfg.server_port;
 }
-const char* ConfigManager::room_target() {
-    return cfg.room.c_str();
+const char* ConfigManager::ha_token() {
+    return cfg.ha_token.c_str();
 }
 uint32_t ConfigManager::sample_rate() {
     return cfg.sample_rate;
@@ -152,9 +148,9 @@ void ConfigManager::load_button_defaults(RoomTargetStore& store) {
 // ── Pin accessors ───────────────────────────────────
 
 const uint8_t* ConfigManager::active_pins() {
-    return cfg.pins;
+    return cfg.button_pins;
 }
 
 uint8_t ConfigManager::active_pin_count() {
-    return cfg.pin_count;
+    return cfg.button_count;
 }

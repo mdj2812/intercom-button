@@ -30,19 +30,36 @@ MAX9814 增益：将 GAIN 焊盘接地获得 50dB（桌面使用推荐）。
 {
     "wifi_ssid": "你的WiFi",
     "wifi_password": "你的密码",
-    "server_host": "192.168.99.10",
-    "server_port": 8764,
-    "room": "study",
+    "server_scheme": "http",
+    "server_host": "192.168.99.4",
+    "server_port": 8123,
+    "ha_token": "",
     "sample_rate": 16000,
-    "max_record_secs": 60
+    "max_record_secs": 60,
+    "buttons": {
+        "4": "study",
+        "5": "living",
+        "12": "cinema",
+        "13": "bedroom"
+    }
 }
 ```
 
-房间键值（来自 `rooms.json`）：`study`、`living`、`cinema`、`bedroom`，或 `all` 广播所有房间。
+| 字段 | 说明 |
+|------|------|
+| `server_scheme` | 可信局域网使用 `http`，远端 HA 使用 `https`。HTTPS 流量已加密，但当前固件暂不验证服务器证书。 |
+| `server_host` | Home Assistant 的 IP（Docker 模式填 Docker 主机 IP） |
+| `server_port` | HA 集成用 `8123`，Docker 旧模式用 `8764` |
+| `ha_token` | HA 长期访问令牌。Docker 模式**留空**即可。HA 模式下，请[创建受限令牌](https://www.home-assistant.io/docs/authentication/#your-account-profile)，仅给最小权限——**不要用管理员令牌**。令牌以明文存储在 ESP32 闪存中；如果设备物理丢失，可在 HA 后台立即吊销。 |
+| `buttons` | 每个 GPIO 引脚对应的默认房间。键为 GPIO 编号，值为 `rooms.json` 中的房间 ID（`study`、`living`、`cinema`、`bedroom`，或 `all` 向所有房间广播）。 |
+| `sample_rate` | 音频采样率，单位 Hz（默认 16000） |
+| `max_record_secs` | 最大录音时长，单位秒（默认 60） |
 
 复制 `data/config.example.json` 为 `data/config.json` 并填入你的设置。`data/config.json` 已加入 `.gitignore`——凭证不会泄露。
 
-**多按键部署**：烧录一次固件，然后每个设备修改 `data/config.json`（改 `room`）后执行 `pio run -e esp32-s3-devkitc-1 -t uploadfs`。
+配置 `ha_token` 后，请求会带上 `Authorization: *** 认证头；未配置时无认证头（兼容 Docker 模式）。
+
+**多按键部署**：烧录一次固件，然后每个设备修改 `data/config.json`（改 `buttons` 映射）后执行 `pio run -e esp32-s3-devkitc-1 -t uploadfs`。
 
 ## 快速开始
 
@@ -256,7 +273,7 @@ make monitor
 
 ```text
 === ESP32-S3 Intercom Button ===
-[cfg] Loaded: room=study server=192.168.99.10:8764 wifi=MyWiFi
+[cfg] Loaded: server=https://ha.example.com:443 wifi=MyWiFi buttons=4
 [wifi] Connecting to MyWiFi...
 [wifi] Connected
 [audio] Buffer: 960000 samples (60 sec), PSRAM free: 7654 KB
@@ -264,7 +281,7 @@ make monitor
 [main] Setup complete — ready.
 [main] Recording...
 [audio] Stopped — 48000 samples (3.0s)
-[upload] POST http://192.168.99.10:8764/record?target=study (96044 bytes) attempt 1/3
+[upload] POST https://ha.example.com:443/api/home_intercom/device/record?target=study (96044 bytes) attempt 1/3
 [upload] OK: {"ok":true,"rooms_sent":1,...}
 [main] Upload OK (1725 ms)
 ```

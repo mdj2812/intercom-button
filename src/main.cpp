@@ -94,8 +94,8 @@ void setup() {
     ConfigManager::begin();
     MAX_RECORD_MS = ConfigManager::max_record_secs() * 1000UL;
 
-    Serial.printf("Server: %s:%u | Max: %us\n", ConfigManager::server_host(), ConfigManager::server_port(),
-                  ConfigManager::max_record_secs());
+    Serial.printf("Server: %s://%s:%u | Max: %us\n", ConfigManager::server_scheme(), ConfigManager::server_host(),
+                  ConfigManager::server_port(), ConfigManager::max_record_secs());
 
     // ── Per-button room mapping (NVS + config.json) ─
     if (!room_store.begin()) {
@@ -253,8 +253,9 @@ void loop() {
             uint8_t gpio = active_pins[active_button_index];
             std::string room = room_store.get_room(gpio);
 
-            bool ok = HTTPUploader::upload(recorder.data(), recorder.total_bytes(), ConfigManager::server_host(),
-                                           ConfigManager::server_port(), room.c_str());
+            bool ok = HTTPUploader::upload(recorder.data(), recorder.total_bytes(), ConfigManager::server_scheme(),
+                                           ConfigManager::server_host(), ConfigManager::server_port(), room.c_str(),
+                                           ConfigManager::ha_token());
 
             unsigned long upload_ms = millis() - upload_start_ms;
             Serial.printf("[main] Upload to %s %s (%lu ms)\n", room.c_str(), ok ? "OK" : "FAILED", upload_ms);
