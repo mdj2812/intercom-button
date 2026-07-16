@@ -71,6 +71,7 @@ void test_upload_sets_content_type_wav(void) {
 
 // ── Test 6: Docker URL uses the legacy unauthenticated endpoint ──
 void test_upload_url_format_is_docker_api_endpoint(void) {
+    // UTF-8 bytes for "房间"
     HTTPUploader::upload(test_data, sizeof(test_data), "http", "192.168.1.1", 8764, "\346\210\277\351\227\264", "");
     std::string expected = "http://192.168.1.1:8764/api/home_intercom/record?target=\346\210\277\351\227\264";
     TEST_ASSERT_EQUAL_STRING(expected.c_str(), _http_mock.last_url.c_str());
@@ -81,7 +82,7 @@ void test_upload_adds_auth_header_with_token(void) {
     mock_http_set_response(200, R"({"ok":true})");
     HTTPUploader::upload(test_data, sizeof(test_data), "http", "ha.local", 8123, "living", "test-token-123");
     TEST_ASSERT_TRUE(_http_mock.last_auth_header.find("Bearer test-token-123") != std::string::npos);
-    TEST_ASSERT_TRUE(_http_mock.last_url.find("/api/home_intercom/device/record?target=living") != std::string::npos);
+    TEST_ASSERT_TRUE(_http_mock.last_url.find("/api/home_intercom/record?target=living") != std::string::npos);
 }
 
 // ── Test 8: No auth header when ha_token is empty ──
@@ -101,7 +102,7 @@ void test_upload_no_auth_header_with_null_token(void) {
 // ── Test 10: HTTPS scheme creates a secure client and HTTPS URL ──
 void test_upload_https_scheme(void) {
     HTTPUploader::upload(test_data, sizeof(test_data), "https", "ha.example.com", 443, "study", "token");
-    TEST_ASSERT_EQUAL_STRING("https://ha.example.com:443/api/home_intercom/device/record?target=study",
+    TEST_ASSERT_EQUAL_STRING("https://ha.example.com:443/api/home_intercom/record?target=study",
                              _http_mock.last_url.c_str());
     TEST_ASSERT_TRUE(_secure_client_insecure);
 }

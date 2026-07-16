@@ -28,8 +28,8 @@ struct Config {
     String wifi_ssid = "your_wifi_ssid";
     String wifi_password = "your_wifi_password";
     String server_scheme = "http";
-    String server_host = "192.168.99.10";
-    uint16_t server_port = 8764;
+    String server_host = "192.168.99.4";
+    uint16_t server_port = 8123;
     uint32_t sample_rate = 16000;
     uint32_t max_secs = 60;
 

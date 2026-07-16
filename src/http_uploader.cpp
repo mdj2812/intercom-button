@@ -17,7 +17,7 @@ bool HTTPUploader::upload(const uint8_t* data, size_t size, const char* server_s
 
     const bool use_https = server_scheme && strcmp(server_scheme, "https") == 0;
     const bool use_ha_auth = ha_token && ha_token[0] != '\0';
-    const char* endpoint = use_ha_auth ? "/api/home_intercom/device/record" : "/api/home_intercom/record";
+    const char* endpoint = "/api/home_intercom/record";
 
     // std::ostringstream — type-safe URL construction, no printf format-string issues.
     std::ostringstream oss;
@@ -37,6 +37,7 @@ bool HTTPUploader::upload(const uint8_t* data, size_t size, const char* server_s
             // Encrypt traffic, but do not verify server identity yet. See README.
             secure_client.setInsecure();
             began = http.begin(secure_client, url);
+            Serial.printf("[%s] HTTPS enabled — server certificate NOT verified\n", TAG);
         } else {
             began = http.begin(plain_client, url);
         }
@@ -60,7 +61,7 @@ bool HTTPUploader::upload(const uint8_t* data, size_t size, const char* server_s
             String body = http.getString();
             http.end();
             // Accept any 2xx response — server may respond before HA finishes
-            if (body.indexOf("\"ok\":true") > 0 || body.indexOf("\"ok\":") > 0) {
+            if (body.indexOf("\"ok\":true") >= 0 || body.indexOf("\"ok\":") >= 0) {
                 Serial.printf("[%s] OK: %s\n", TAG, body.c_str());
                 return true;
             }
