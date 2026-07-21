@@ -2,6 +2,12 @@
 
 ESP32-S3 push-to-talk desktop button for the [home-intercom](https://github.com/mdj2812/home-intercom) system. Press and hold to record, release to broadcast to a target room via Xiaomi smart speakers.
 
+## Demo
+
+![Demo](docs/demo.gif)
+
+*Press & hold → record voice → release → broadcast to the study room speaker. [Full quality video](docs/demo.mp4)*
+
 ## Hardware
 
 | Component | Notes |
