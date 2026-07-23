@@ -18,7 +18,7 @@ assembly_shell_alpha = 0.28;
 selected_part = is_undef(render_part) ? part : render_part;
 
 // Overall enclosure
-case_w = 68;
+case_w = 80;
 case_d = 98;
 front_h = 38;
 rear_h = 44;
@@ -38,11 +38,10 @@ magnet_fit = 0.2;
 magnet_pocket_d = magnet_d + magnet_fit;
 magnet_pocket_h = magnet_h + magnet_fit;
 magnet_boss_d = 9;
-magnet_right_x = 62.2;
+magnet_right_x = 74;
 magnet_points = [
     [magnet_x, magnet_y],
-    // Right-wall position clears the shifted ESP32 antenna keepout.
-    [magnet_right_x, 21.5],
+    [magnet_right_x, magnet_y],
     [magnet_x, case_d - magnet_y],
     [magnet_right_x, case_d - magnet_y]
 ];
@@ -59,7 +58,7 @@ button_y = 23;
 esp_w = 25.40;
 esp_l = 62.74;
 esp_t = 1.6;
-esp_rear_clearance = 2;
+esp_rear_clearance = 2.2;
 esp_y =
     case_d - wall - fit - esp_rear_clearance - esp_l;
 esp_module_overhang = 3.5;
@@ -68,27 +67,22 @@ esp_header_count = 22;
 esp_header_row_spacing = 22.86;
 esp_header_y = esp_y + 2.5;
 
-carrier_w = 30;
-carrier_l = 70;
-carrier_t = 1.6;
-carrier_x = 42.3;
-carrier_hole_rows = 28;
-carrier_header_y_index = 4;
-carrier_hole_y_margin =
-    (carrier_l - (carrier_hole_rows - 1) * esp_header_pitch) / 2;
-carrier_y =
-    esp_header_y - carrier_hole_y_margin
-        - carrier_header_y_index * esp_header_pitch;
-carrier_adhesive_h = 2;
-carrier_adhesive_size = 6;
-carrier_z = floor_t + carrier_adhesive_h;
-esp_x = carrier_x;
-socket_w = 2.54;
-socket_l = esp_header_count * esp_header_pitch;
-socket_h = 8.5;
-socket_z = carrier_z + carrier_t;
+breadboard_w = 55;
+breadboard_l = 82.5;
+breadboard_h = 8.5;
+breadboard_x = 41.5;
+breadboard_hole_rows = 30;
+breadboard_header_y_index = 7;
+breadboard_hole_y_margin =
+    (breadboard_l
+        - (breadboard_hole_rows - 1) * esp_header_pitch) / 2;
+breadboard_y =
+    esp_header_y - breadboard_hole_y_margin
+        - breadboard_header_y_index * esp_header_pitch;
+breadboard_z = floor_t;
+esp_x = breadboard_x;
 male_header_spacer = 2.5;
-esp_z = socket_z + socket_h + male_header_spacer;
+esp_z = breadboard_z + breadboard_h + male_header_spacer;
 
 // Separate rear openings leave a center bridge between the two USB ports.
 usb_port_w = 8.5;
@@ -376,68 +370,45 @@ module esp32_mockup() {
     board_x0 = esp_x - esp_w / 2;
     board_y1 = esp_y + esp_l;
     module_y = esp_y - esp_module_overhang;
-    socket_y0 = esp_header_y - esp_header_pitch / 2;
-    carrier_x0 = carrier_x - carrier_w / 2;
-    carrier_hole_x0 =
-        carrier_x0 + (carrier_w - 11 * esp_header_pitch) / 2;
-    carrier_hole_y0 =
-        carrier_y + (carrier_l - 27 * esp_header_pitch) / 2;
+    breadboard_x0 = breadboard_x - breadboard_w / 2;
+    breadboard_hole_y0 = breadboard_y + breadboard_hole_y_margin;
     header_xs = [
         esp_x - esp_header_row_spacing / 2,
         esp_x + esp_header_row_spacing / 2
     ];
 
-    // Four foam-tape pads bond the carrier directly to the enclosure floor
-    // while clearing solder joints and wiring underneath.
-    for (x = [
-        carrier_x0 + 2,
-        carrier_x0 + carrier_w - carrier_adhesive_size - 2
-    ])
-        for (y = [
-            carrier_y + 2,
-            carrier_y + carrier_l - carrier_adhesive_size - 2
+    // Half-size solderless breadboard and representative terminal holes
+    color([0.93, 0.93, 0.90])
+        translate([breadboard_x0, breadboard_y, breadboard_z])
+            cube([breadboard_w, breadboard_l, breadboard_h]);
+    color([0.72, 0.72, 0.68])
+        translate([
+            breadboard_x - 2.5,
+            breadboard_y,
+            breadboard_z + breadboard_h
         ])
-            color([0.18, 0.18, 0.18, 0.75])
-                translate([x, y, floor_t])
-                    cube([
-                        carrier_adhesive_size,
-                        carrier_adhesive_size,
-                        carrier_adhesive_h
-                    ]);
-
-    // 70 x 30 mm perfboard carrier and representative 2.54 mm hole grid
-    color([0.34, 0.44, 0.20])
-        translate([carrier_x0, carrier_y, carrier_z])
-            cube([carrier_w, carrier_l, carrier_t]);
-    for (ix = [0 : 11])
-        for (iy = [0 : 27])
-            color([0.08, 0.10, 0.06])
-                translate([
-                    carrier_hole_x0 + ix * esp_header_pitch,
-                    carrier_hole_y0 + iy * esp_header_pitch,
-                    carrier_z + carrier_t
-                ])
-                    cylinder(h = 0.15, d = 1.0, $fn = 10);
+            cube([5, breadboard_l, 0.2]);
+    for (row = [0 : breadboard_hole_rows - 1])
+        for (side = [-1, 1])
+            for (column = [0 : 4])
+                color([0.10, 0.10, 0.10])
+                    translate([
+                        breadboard_x
+                            + side * (3.81
+                                + column * esp_header_pitch),
+                        breadboard_hole_y0
+                            + row * esp_header_pitch,
+                        breadboard_z + breadboard_h
+                    ])
+                        cylinder(h = 0.2, d = 1.0, $fn = 10);
 
     // PCB
     color([0.04, 0.42, 0.18])
         translate([board_x0, esp_y, esp_z])
             cube([esp_w, esp_l, esp_t]);
 
-    // Female socket bodies, male-header plastic, and connecting pins
+    // Male-header plastic and pins inserted into the breadboard
     for (x = header_xs) {
-        color([0.05, 0.05, 0.05])
-            translate([
-                x - socket_w / 2,
-                socket_y0,
-                socket_z
-            ])
-                cube([
-                    socket_w,
-                    socket_l,
-                    socket_h
-                ]);
-
         color([0.04, 0.04, 0.04])
             translate([
                 x - 1.0,
@@ -456,10 +427,11 @@ module esp32_mockup() {
                 translate([
                     x,
                     esp_header_y + i * esp_header_pitch,
-                    carrier_z - 2
+                    breadboard_z + breadboard_h - 4
                 ])
                     cylinder(
-                        h = esp_z - carrier_z + 2.2,
+                        h = esp_z
+                            - (breadboard_z + breadboard_h) + 4.2,
                         d = 0.65,
                         $fn = 12
                     );

@@ -5,11 +5,8 @@ English | [简体中文](BOM.zh-CN.md)
 ## Required
 
 - ESP32-S3-DevKitC-1 ×1
-- 1×22, 2.54 mm female socket strips ×2
-  - Alternatively, cut one section from each of two 1×40 strips
-  - Typical plastic body: 2.54 × 55.88 × 8.5 mm
-- 70 × 30 × 1.6 mm, 2.54 mm-pitch perfboard ×1
-- 2 mm acrylic foam tape or neutral-cure silicone for mounting the carrier
+- Half-size solderless breadboard, approximately 82.5 × 55 × 8.5 mm ×1
+- Male-to-male 2.54 mm jumper wires
 - MAX9814 microphone module ×1
   - PCB: 25 × 14 mm
   - Microphone can height: approximately 9 mm
