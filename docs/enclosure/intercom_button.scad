@@ -310,40 +310,34 @@ module mic_pocket() {
             rail_t
         ]);
 
-    // Two integral cantilever latches behind the PCB.
-    // Their tapered hooks flex rearward during insertion and return below
-    // the PCB edge.
+    // One wide central cantilever latch leaves both PCB ends clear for
+    // soldered wires. Its tapered hook flexes rearward during insertion.
     board_bottom = mic_z - mic_h / 2;
-    snap_w = 6;
+    snap_w = 10;
     snap_t = 0.8;
     snap_hook = 1.4;
     snap_hook_h = 1.2;
-    snap_xs = [
-        mic_board_x - mic_w / 2 + 2,
-        mic_board_x + mic_w / 2 - snap_w - 2
-    ];
+    snap_x = mic_board_x - snap_w / 2;
     snap_y = slot_back + 0.2;
     snap_bottom = board_bottom - 0.2;
     snap_top = z0 + pocket_h + 0.2;
 
-    for (snap_x = snap_xs) {
-        translate([snap_x, snap_y, snap_bottom])
-            cube([
-                snap_w,
-                snap_t,
-                snap_top - snap_bottom
-            ]);
+    translate([snap_x, snap_y, snap_bottom])
+        cube([
+            snap_w,
+            snap_t,
+            snap_top - snap_bottom
+        ]);
 
-        hull() {
-            translate([
-                snap_x,
-                snap_y - snap_hook,
-                snap_bottom - snap_hook_h
-            ])
-                cube([snap_w, snap_t + snap_hook, 0.2]);
-            translate([snap_x, snap_y, snap_bottom - 0.1])
-                cube([snap_w, snap_t, 0.2]);
-        }
+    hull() {
+        translate([
+            snap_x,
+            snap_y - snap_hook,
+            snap_bottom - snap_hook_h
+        ])
+            cube([snap_w, snap_t + snap_hook, 0.2]);
+        translate([snap_x, snap_y, snap_bottom - 0.1])
+            cube([snap_w, snap_t, 0.2]);
     }
 }
 

@@ -56,7 +56,7 @@ Open `intercom_button.scad` with `part = "assembly"`. The default preview render
 1. Test-position the half-size breadboard, remove its backing film, and bond it directly to the enclosure floor.
 2. Insert the ESP32 into the breadboard with its Micro-USB ports aligned to the rear openings.
 3. Use male jumper wires to connect the 3.3V, GND, GPIO1, and GPIO4 breadboard rows to the lid's JST pigtail.
-4. Push the MAX9814 upward into the lid rails until both integrated latches engage. Align the microphone can with the grille. To remove it, gently deflect both latches.
+4. Push the MAX9814 upward into the lid rails until the wide central latch engages. Align the microphone can with the grille. To remove it, gently deflect the latch.
 5. Insert the button through the Ø22.2 mm top opening and secure it with its supplied nut.
 6. Arrange all eight Ø6 × 2 mm magnets and mark their polarities.
 7. Bond the magnets into the Ø6.2 × 2.2 mm blind pockets with epoxy, ensuring that every opposing pair attracts.
