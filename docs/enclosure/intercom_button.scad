@@ -91,9 +91,9 @@ male_header_spacer = 2.5;
 esp_z = socket_z + socket_h + male_header_spacer;
 
 // Separate rear openings leave a center bridge between the two USB ports.
-usb_port_w = 10;
-usb_center_gap = 3;
-usb_h = 5;
+usb_port_w = 8.5;
+usb_center_gap = 4.2;
+usb_h = 4.2;
 usb_z = esp_z + esp_t - 0.8;
 
 // MAX9814 vertical pocket behind the front grille
@@ -473,18 +473,18 @@ module esp32_mockup() {
         translate([esp_x - 9, module_y + 7, esp_z + esp_t])
             cube([18, 18, 3]);
 
-    // Two USB-C receptacles
+    // Two Micro-USB receptacles
     for (x = [
         esp_x - usb_center_gap / 2 - usb_port_w / 2,
         esp_x + usb_center_gap / 2 + usb_port_w / 2
     ])
         color([0.68, 0.70, 0.72])
             translate([
-                x - 4.5,
-                board_y1 - 6,
+                x - 3.75,
+                board_y1 - 5.5,
                 esp_z + esp_t
             ])
-                cube([9, 8, 3.3]);
+                cube([7.5, 7, 3.0]);
 }
 
 module mic_mockup() {

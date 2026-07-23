@@ -136,7 +136,7 @@ Docker 变体：加 `docker-` 前缀（如 `make docker-build`、`make docker-fl
 
 ### 首次 USB 烧录
 
-1. 用 USB-C 连接 ESP32-S3
+1. 用 Micro-USB 连接 ESP32-S3
 2. `make flash`
 3. `make flashfs`（编辑好 `data/config.json` 后）
 

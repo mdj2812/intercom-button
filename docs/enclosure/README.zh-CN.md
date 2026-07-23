@@ -19,7 +19,7 @@
 - 按钮开孔：Ø22.2 mm，外圈 Ø30.5 × 1.2 mm 沉台
 - 上下壳定位及闭合：4 对 Ø6 × 2 mm 钕磁铁，无定位裙边
 - ESP32 固定：70 × 30 × 1.6 mm 洞洞板载板焊接两条 1×22 母排针，使用四块 2 mm 泡棉胶直接粘到底板
-- USB 开口：两个 10 × 5 mm 独立开口，中间保留 3 mm 固定桥位
+- Micro-USB 开口：两个 8.5 × 4.2 mm 独立开口，中间保留 4.2 mm 桥位
 
 外壳采用上下分体结构。ESP32 安装在底壳右侧，USB 接口朝后；按钮位于左前方，以减少金属按钮对 ESP32 天线的影响。MAX9814 竖直安装在前面板后方，前面板有七孔拾音格栅。
 
@@ -35,7 +35,7 @@
 
 ### 装配预览
 
-使用 `part = "assembly"` 打开 `intercom_button.scad`。默认预览会显示半透明外壳，以及按尺寸简化的 ESP32-S3 开发板、WROOM 天线模块、公母排针、两个 USB-C 口、MAX9814 PCB 和麦克风罐、完整面板按钮。将 `show_components` 改为 `false` 可只查看不透明外壳。
+使用 `part = "assembly"` 打开 `intercom_button.scad`。默认预览会显示半透明外壳，以及按尺寸简化的 ESP32-S3 开发板、WROOM 天线模块、公母排针、两个 Micro-USB 口、MAX9814 PCB 和麦克风罐、完整面板按钮。将 `show_components` 改为 `false` 可只查看不透明外壳。
 
 ### GitHub Actions 自动生成
 

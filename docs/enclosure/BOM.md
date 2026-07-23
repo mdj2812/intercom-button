@@ -23,7 +23,7 @@ English | [简体中文](BOM.zh-CN.md)
 - 26–28 AWG flexible silicone wire
 - Heat-shrink tubing
 - Two-part epoxy ×1
-- USB-C data/power cable ×1
+- Micro-USB data/power cable ×1
 - PETG-printed base and lid ×1 set
 
 ## Optional
@@ -31,11 +31,5 @@ English | [简体中文](BOM.zh-CN.md)
 - 1–2 mm open-cell foam for microphone isolation and dust protection
 - 5V/1A USB power adapter
 - Solder and flux
-
-## Not Required
-
-- Breadboard
-- Enclosure screws
-- Hot-melt glue for securing magnets
 
 Use a small amount of two-part epoxy to secure the magnets. Confirm the polarity of every corresponding base/lid magnet pair before bonding them in place.

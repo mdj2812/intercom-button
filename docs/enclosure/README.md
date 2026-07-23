@@ -19,7 +19,7 @@ This is the first parametric OpenSCAD enclosure design for:
 - Button opening: Ø22.2 mm with a Ø30.5 × 1.2 mm counterbore
 - Shell alignment and closure: four pairs of Ø6 × 2 mm neodymium magnets, without an alignment skirt
 - ESP32 mount: 70 × 30 × 1.6 mm perfboard carrier with two 1×22 female socket strips, bonded directly to the floor with four 2 mm foam-tape pads
-- USB openings: two separate 10 × 5 mm openings with a 3 mm center retention bridge
+- Micro-USB openings: two separate 8.5 × 4.2 mm openings with a 4.2 mm center bridge
 
 The enclosure has separate base and lid parts. The ESP32 mounts toward the right side of the base with its USB ports facing rearward. The button sits at the front-left to keep its metal body away from the ESP32 antenna. The MAX9814 mounts vertically behind a seven-hole grille in the front panel.
 
@@ -35,7 +35,7 @@ Change dimensions only in the shared file so the base and lid remain synchronize
 
 ### Assembly Preview
 
-Open `intercom_button.scad` with `part = "assembly"`. The default preview renders a translucent enclosure together with dimensioned mockups of the ESP32-S3 board, WROOM antenna module, male/female headers, USB-C ports, MAX9814 board and microphone can, and the complete panel-mount button. Set `show_components = false` for an opaque enclosure-only view.
+Open `intercom_button.scad` with `part = "assembly"`. The default preview renders a translucent enclosure together with dimensioned mockups of the ESP32-S3 board, WROOM antenna module, male/female headers, Micro-USB ports, MAX9814 board and microphone can, and the complete panel-mount button. Set `show_components = false` for an opaque enclosure-only view.
 
 ### GitHub Actions
 
