@@ -18,7 +18,7 @@ This is the first parametric OpenSCAD enclosure design for:
 - Top thickness: 3.2 mm (2.0 mm remains below the button recess)
 - Button opening: Ø22.2 mm with a Ø30.5 × 1.2 mm counterbore
 - Shell alignment and closure: four pairs of Ø6 × 2 mm neodymium magnets, without an alignment skirt
-- Clearance below the ESP32 PCB: approximately 8.2 mm for headers and wiring
+- ESP32 mount: 70 × 30 × 1.6 mm perfboard carrier with two 1×22 female socket strips, bonded directly to the floor with four 2 mm foam-tape pads
 - USB openings: two separate 10 × 5 mm openings with a 3 mm center retention bridge
 
 The enclosure has separate base and lid parts. The ESP32 mounts toward the right side of the base with its USB ports facing rearward. The button sits at the front-left to keep its metal body away from the ESP32 antenna. The MAX9814 mounts vertically behind a seven-hole grille in the front panel.
@@ -35,7 +35,7 @@ Change dimensions only in the shared file so the base and lid remain synchronize
 
 ### Assembly Preview
 
-Open `intercom_button.scad` with `part = "assembly"`. The default preview renders a translucent enclosure together with dimensioned mockups of the ESP32-S3 board, WROOM antenna module, pin headers, USB-C ports, MAX9814 board and microphone can, and the complete panel-mount button. Set `show_components = false` for an opaque enclosure-only view.
+Open `intercom_button.scad` with `part = "assembly"`. The default preview renders a translucent enclosure together with dimensioned mockups of the ESP32-S3 board, WROOM antenna module, male/female headers, USB-C ports, MAX9814 board and microphone can, and the complete panel-mount button. Set `show_components = false` for an opaque enclosure-only view.
 
 ### GitHub Actions
 
@@ -43,7 +43,7 @@ Open `intercom_button.scad` with `part = "assembly"`. The default preview render
 
 ## Recommended Print Settings
 
-- Material: PETG recommended; the ESP32 and microphone clips are not suitable for repeated flexing when printed in PLA
+- Material: PETG recommended; the microphone clips are not suitable for repeated flexing when printed in PLA
 - Nozzle: 0.4 mm
 - Layer height: 0.20 mm
 - Walls: 3 perimeters
@@ -53,19 +53,21 @@ Open `intercom_button.scad` with `part = "assembly"`. The default preview render
 
 ## Assembly
 
-1. Place the ESP32 in the base cradle with its USB ports aligned to the rear openings.
-2. Insert the USB end at an angle beneath the center tab between the two USB ports and against the rear stop. Press down the antenna end until the two opposing clips engage the top of the PCB.
-3. Push the MAX9814 upward into the lid rails until both integrated latches engage. Align the microphone can with the grille. To remove it, gently deflect both latches.
-4. Insert the button through the Ø22.2 mm top opening and secure it with its supplied nut.
-5. Arrange all eight Ø6 × 2 mm magnets and mark their polarities.
-6. Bond the magnets into the Ø6.2 × 2.2 mm blind pockets with epoxy, ensuring that every opposing pair attracts.
-7. Allow the epoxy to cure fully before closing the enclosure. To open it, carefully separate the shells at the USB openings.
+1. Solder the two 1×22 female socket strips, JST connector, and required wiring to a 70 × 30 mm perfboard carrier.
+2. Apply four small 2 mm acrylic foam-tape pads to the carrier corners, then bond the carrier directly to the base. Neutral-cure silicone applied with temporary 2 mm spacers is an alternative.
+3. Insert the ESP32 male headers vertically into the sockets with its USB ports aligned to the rear openings.
+4. Push the MAX9814 upward into the lid rails until both integrated latches engage. Align the microphone can with the grille. To remove it, gently deflect both latches.
+5. Insert the button through the Ø22.2 mm top opening and secure it with its supplied nut.
+6. Arrange all eight Ø6 × 2 mm magnets and mark their polarities.
+7. Bond the magnets into the Ø6.2 × 2.2 mm blind pockets with epoxy, ensuring that every opposing pair attracts.
+8. Allow the epoxy to cure fully before closing the enclosure. To open it, carefully separate the shells at the USB openings.
 
 ## First Test Fit
 
 Compatible boards from different manufacturers may vary by 1–3 mm from the Espressif reference design. Before the final print, verify:
 
 - The development board length, width, and combined USB connector spacing
+- The perfboard dimensions, female socket-strip bodies, and header-row spacing
 - The MAX9814 PCB dimensions and microphone position
 - That the button barrel passes through a Ø22.2 mm test opening
 - Your printer's hole-size and shell-fit tolerances

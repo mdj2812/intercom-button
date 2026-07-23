@@ -37,13 +37,14 @@ magnet_h = 2;
 magnet_fit = 0.2;
 magnet_pocket_d = magnet_d + magnet_fit;
 magnet_pocket_h = magnet_h + magnet_fit;
-magnet_boss_d = 9.5;
+magnet_boss_d = 9;
+magnet_right_x = 62.2;
 magnet_points = [
     [magnet_x, magnet_y],
     // Right-wall position clears the shifted ESP32 antenna keepout.
-    [case_w - magnet_x, 21.5],
+    [magnet_right_x, 21.5],
     [magnet_x, case_d - magnet_y],
-    [case_w - magnet_x, case_d - magnet_y]
+    [magnet_right_x, case_d - magnet_y]
 ];
 
 // Button
@@ -58,19 +59,42 @@ button_y = 23;
 esp_w = 25.40;
 esp_l = 62.74;
 esp_t = 1.6;
-esp_x = 43;
 esp_rear_clearance = 2;
 esp_y =
     case_d - wall - fit - esp_rear_clearance - esp_l;
-esp_z = 11;
-esp_end_support = 2.2;
 esp_module_overhang = 3.5;
+esp_header_pitch = 2.54;
+esp_header_count = 22;
+esp_header_row_spacing = 22.86;
+esp_header_y = esp_y + 2.5;
+
+carrier_w = 30;
+carrier_l = 70;
+carrier_t = 1.6;
+carrier_x = 42.3;
+carrier_hole_rows = 28;
+carrier_header_y_index = 4;
+carrier_hole_y_margin =
+    (carrier_l - (carrier_hole_rows - 1) * esp_header_pitch) / 2;
+carrier_y =
+    esp_header_y - carrier_hole_y_margin
+        - carrier_header_y_index * esp_header_pitch;
+carrier_adhesive_h = 2;
+carrier_adhesive_size = 6;
+carrier_z = floor_t + carrier_adhesive_h;
+esp_x = carrier_x;
+socket_w = 2.54;
+socket_l = esp_header_count * esp_header_pitch;
+socket_h = 8.5;
+socket_z = carrier_z + carrier_t;
+male_header_spacer = 2.5;
+esp_z = socket_z + socket_h + male_header_spacer;
 
 // Separate rear openings leave a center bridge between the two USB ports.
 usb_port_w = 10;
 usb_center_gap = 3;
 usb_h = 5;
-usb_z = 11.8;
+usb_z = esp_z + esp_t - 0.8;
 
 // MAX9814 vertical pocket behind the front grille
 mic_w = 25;
@@ -150,109 +174,6 @@ module base_magnet_pockets() {
             );
 }
 
-module esp_supports() {
-    board_x0 = esp_x - esp_w / 2;
-    board_x1 = esp_x + esp_w / 2;
-    board_y0 = esp_y;
-    board_y1 = esp_y + esp_l;
-    board_top = esp_z + esp_t;
-    pad_w = 4;
-
-    // Four small end pads keep header pins clear of the floor.
-    for (x = [board_x0 + 1, board_x1 - pad_w - 1])
-        for (y = [board_y0, board_y1 - 5])
-            translate([x, y, floor_t])
-                cube([pad_w, esp_end_support, esp_z - floor_t]);
-
-    // The rear stop locates the USB end. The two USB cutouts remove most
-    // of it while leaving a center bridge between the connectors.
-    translate([board_x0 - fit, board_y1, floor_t])
-        cube([esp_w + 2 * fit, 1.2, board_top - floor_t]);
-
-    // Rear side stops touch only the PCB corners.
-    for (x = [board_x0 - 1.2, board_x1])
-        translate([x, board_y1 - 5, floor_t])
-            cube([1.2, 5, board_top - floor_t]);
-
-    // One fixed hold-down tab uses the bridge between the two USB ports.
-    // Insert the USB end under this tab before pressing down the antenna end.
-    center_tab_w = usb_center_gap - 0.4;
-    center_tab_y = board_y1 - 1;
-    rear_structure_y1 = board_y1 + 1.5;
-    translate([
-        esp_x - center_tab_w / 2,
-        board_y1,
-        floor_t
-    ])
-        cube([
-            center_tab_w,
-            rear_structure_y1 - board_y1,
-            board_top + 1.2 - floor_t
-        ]);
-    translate([
-        esp_x - center_tab_w / 2,
-        center_tab_y,
-        board_top + 0.2
-    ])
-        cube([
-            center_tab_w,
-            rear_structure_y1 - center_tab_y,
-            1.0
-        ]);
-
-    // Opposed cantilever clips retain the left and right PCB edges at the
-    // antenna end. Their hooks face each other and flex outward on insertion.
-    snap_d = 6;
-    snap_t = 0.8;
-    snap_hook = 0.8;
-    snap_hook_h = 1.2;
-    snap_y = board_y0 + 0.5;
-    left_snap_x = board_x0 - snap_t - 0.6;
-    right_snap_x = board_x1 + 0.6;
-
-    translate([left_snap_x, snap_y, floor_t])
-        cube([
-            snap_t,
-            snap_d,
-            board_top + snap_hook_h - floor_t
-        ]);
-    hull() {
-        translate([
-            left_snap_x,
-            snap_y,
-            board_top + snap_hook_h - 0.1
-        ])
-            cube([snap_t, snap_d, 0.2]);
-        translate([
-            left_snap_x,
-            snap_y,
-            board_top + 0.2
-        ])
-            cube([snap_t + snap_hook, snap_d, 0.2]);
-    }
-
-    translate([right_snap_x, snap_y, floor_t])
-        cube([
-            snap_t,
-            snap_d,
-            board_top + snap_hook_h - floor_t
-        ]);
-    hull() {
-        translate([
-            right_snap_x,
-            snap_y,
-            board_top + snap_hook_h - 0.1
-        ])
-            cube([snap_t, snap_d, 0.2]);
-        translate([
-            right_snap_x - snap_hook,
-            snap_y,
-            board_top + 0.2
-        ])
-            cube([snap_t + snap_hook, snap_d, 0.2]);
-    }
-}
-
 module base() {
     difference() {
         union() {
@@ -267,7 +188,6 @@ module base() {
                     );
             }
             base_magnet_bosses();
-            esp_supports();
         }
 
         base_magnet_pockets();
@@ -456,41 +376,93 @@ module esp32_mockup() {
     board_x0 = esp_x - esp_w / 2;
     board_y1 = esp_y + esp_l;
     module_y = esp_y - esp_module_overhang;
-    header_y = esp_y + 2.5;
-    header_pitch = 2.54;
-    header_count = 22;
+    socket_y0 = esp_header_y - esp_header_pitch / 2;
+    carrier_x0 = carrier_x - carrier_w / 2;
+    carrier_hole_x0 =
+        carrier_x0 + (carrier_w - 11 * esp_header_pitch) / 2;
+    carrier_hole_y0 =
+        carrier_y + (carrier_l - 27 * esp_header_pitch) / 2;
     header_xs = [
-        board_x0 + 1.27,
-        board_x0 + esp_w - 1.27
+        esp_x - esp_header_row_spacing / 2,
+        esp_x + esp_header_row_spacing / 2
     ];
+
+    // Four foam-tape pads bond the carrier directly to the enclosure floor
+    // while clearing solder joints and wiring underneath.
+    for (x = [
+        carrier_x0 + 2,
+        carrier_x0 + carrier_w - carrier_adhesive_size - 2
+    ])
+        for (y = [
+            carrier_y + 2,
+            carrier_y + carrier_l - carrier_adhesive_size - 2
+        ])
+            color([0.18, 0.18, 0.18, 0.75])
+                translate([x, y, floor_t])
+                    cube([
+                        carrier_adhesive_size,
+                        carrier_adhesive_size,
+                        carrier_adhesive_h
+                    ]);
+
+    // 70 x 30 mm perfboard carrier and representative 2.54 mm hole grid
+    color([0.34, 0.44, 0.20])
+        translate([carrier_x0, carrier_y, carrier_z])
+            cube([carrier_w, carrier_l, carrier_t]);
+    for (ix = [0 : 11])
+        for (iy = [0 : 27])
+            color([0.08, 0.10, 0.06])
+                translate([
+                    carrier_hole_x0 + ix * esp_header_pitch,
+                    carrier_hole_y0 + iy * esp_header_pitch,
+                    carrier_z + carrier_t
+                ])
+                    cylinder(h = 0.15, d = 1.0, $fn = 10);
 
     // PCB
     color([0.04, 0.42, 0.18])
         translate([board_x0, esp_y, esp_z])
             cube([esp_w, esp_l, esp_t]);
 
-    // Pin-header plastic and downward pins
+    // Female socket bodies, male-header plastic, and connecting pins
     for (x = header_xs) {
         color([0.05, 0.05, 0.05])
             translate([
+                x - socket_w / 2,
+                socket_y0,
+                socket_z
+            ])
+                cube([
+                    socket_w,
+                    socket_l,
+                    socket_h
+                ]);
+
+        color([0.04, 0.04, 0.04])
+            translate([
                 x - 1.0,
-                header_y - 1.0,
-                esp_z + esp_t
+                esp_header_y - 1.0,
+                esp_z - male_header_spacer
             ])
                 cube([
                     2.0,
-                    (header_count - 1) * header_pitch + 2.0,
-                    2.4
+                    (esp_header_count - 1)
+                        * esp_header_pitch + 2.0,
+                    male_header_spacer
                 ]);
 
-        for (i = [0 : header_count - 1])
+        for (i = [0 : esp_header_count - 1])
             color([0.72, 0.72, 0.68])
                 translate([
                     x,
-                    header_y + i * header_pitch,
-                    esp_z - 6
+                    esp_header_y + i * esp_header_pitch,
+                    carrier_z - 2
                 ])
-                    cylinder(h = 8.6, d = 0.65, $fn = 12);
+                    cylinder(
+                        h = esp_z - carrier_z + 2.2,
+                        d = 0.65,
+                        $fn = 12
+                    );
     }
 
     // WROOM module: exposed antenna area and shield can
