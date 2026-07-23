@@ -38,11 +38,10 @@ magnet_pocket_h = magnet_h + magnet_fit;
 magnet_boss_d = 9.5;
 magnet_points = [
     [magnet_x, magnet_y],
-    // Moved rearward to clear the deep front-mounted MAX9814 pocket.
-    [case_w - magnet_x, 25],
+    // Right-wall position clears the shifted ESP32 antenna keepout.
+    [case_w - magnet_x, 21.5],
     [magnet_x, case_d - magnet_y],
-    // Shifted inward so the rear boss clears the ESP32 PCB.
-    [32.5, case_d - magnet_y]
+    [case_w - magnet_x, case_d - magnet_y]
 ];
 
 // Button
@@ -57,16 +56,18 @@ button_y = 23;
 esp_w = 25.40;
 esp_l = 62.74;
 esp_t = 1.6;
-esp_x = 51;
-esp_y = case_d - wall - fit - esp_l;
+esp_x = 43;
+esp_rear_clearance = 2;
+esp_y =
+    case_d - wall - fit - esp_rear_clearance - esp_l;
 esp_z = 11;
 esp_end_support = 2.2;
 
 // Separate rear openings leave a center bridge between the two USB ports.
-usb_port_w = 10.5;
+usb_port_w = 10;
 usb_center_gap = 3;
-usb_h = 13;
-usb_z = 8;
+usb_h = 5;
+usb_z = 11.8;
 
 // MAX9814 vertical pocket behind the front grille
 mic_w = 25;
@@ -174,6 +175,7 @@ module esp_supports() {
     // Insert the USB end under this tab before pressing down the antenna end.
     center_tab_w = usb_center_gap - 0.4;
     center_tab_y = board_y1 - 1;
+    rear_structure_y1 = board_y1 + 1.5;
     translate([
         esp_x - center_tab_w / 2,
         board_y1,
@@ -181,7 +183,7 @@ module esp_supports() {
     ])
         cube([
             center_tab_w,
-            case_d - wall - board_y1 + 0.5,
+            rear_structure_y1 - board_y1,
             board_top + 1.2 - floor_t
         ]);
     translate([
@@ -191,7 +193,7 @@ module esp_supports() {
     ])
         cube([
             center_tab_w,
-            case_d - wall - center_tab_y + 0.5,
+            rear_structure_y1 - center_tab_y,
             1.0
         ]);
 
@@ -448,7 +450,7 @@ module component_mockups() {
         translate([esp_x - esp_w / 2, esp_y, esp_z])
             cube([esp_w, esp_l, esp_t]);
     color([0.65, 0.68, 0.65, 0.75])
-        translate([esp_x - 9, esp_y + 8, esp_z + esp_t])
+        translate([esp_x - 9, esp_y, esp_z + esp_t])
             cube([18, 25, 3]);
 
     // MAX9814 PCB, mounted vertically behind the front wall
