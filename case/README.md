@@ -16,9 +16,11 @@ Parametric OpenSCAD design for the intercom button (breadboard-free assembly).
 ## Specs
 
 - **Outer**: 92 × 48 × 30~44 mm (8° sloped top)
-- **Button**: 22 mm panel mount (M22 thread), center-front
-- **MCU**: ESP32-S3-DevKitC on cradle rails, USB-C out the back
-- **Mic**: MAX9814 taped under top, 5 × 1.2 mm sound holes
+- **Button**: 22 mm panel mount (M22 thread), hole drilled **normal to the
+  sloped top** — bezel sits flush, button tilts 8° toward the user
+- **MCU**: ESP32-S3-DevKitC on cradle rails, USB-C out the back (11 × 6 mm cutout)
+- **Mic**: MAX9814 slides between 4 ceiling pegs (aligned under the
+  5 × 1.2 mm sound holes), fix with double-sided tape
 - **Status LED**: 3 mm light-pipe hole above DevKitC RGB LED
 - **Cover**: 1.6 mm plate, 4 × M2 self-tapping screws into corner bosses
 

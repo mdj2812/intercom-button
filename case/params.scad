@@ -34,7 +34,7 @@ pcb_x0 = 34;     // PCB front edge from interior front
 pcb_y0 = (in_w - pcb_w)/2;
 
 // Mic position (top, near button, side)
-mic_x = 40;
+mic_x = 42;
 mic_y = in_w/2;
 
 $fn = 48;

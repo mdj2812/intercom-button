@@ -10,14 +10,13 @@ module body() {
             shell();
             cradle();
             bosses();
+            mic_pegs();
         }
         button_hole();
+        button_clearance();
         usb_cutout();
         mic_holes();
         lightpipe_hole();
-        // clearance for button body below top
-        translate([wall+btn_x, wall+btn_y, wall])
-            cylinder(h=btn_body_len, d=btn_body_d);
     }
 }
 
