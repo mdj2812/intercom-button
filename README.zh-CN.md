@@ -2,6 +2,12 @@
 
 [home-intercom](https://github.com/mdj2812/home-intercom) 系统的配套硬件——按下录音，松开广播到目标房间的小爱音箱。
 
+## 演示
+
+![演示](docs/demo.gif)
+
+*按住 → 录音 → 松开 → 书房音箱播放。[高清视频](docs/demo.mp4)*
+
 ## 硬件
 
 | 组件 | 说明 |
