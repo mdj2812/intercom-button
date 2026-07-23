@@ -1,5 +1,7 @@
 # 桌面对讲按钮采购清单
 
+[English](BOM.md) | 简体中文
+
 ## 必需物料
 
 - ESP32-S3-DevKitC-1 ×1

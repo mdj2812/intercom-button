@@ -1,5 +1,7 @@
 # 桌面对讲按钮外壳
 
+[English](README.md) | 简体中文
+
 这是第一版可调参数的 OpenSCAD 外壳，适配：
 
 - ESP32-S3-DevKitC-1（官方尺寸 62.74 × 25.40 mm）
@@ -30,6 +32,10 @@
 - `intercom_button.scad`：共享参数、几何模块及装配预览
 
 需要调整尺寸时只修改共享文件，底壳和顶壳会同时更新。
+
+### GitHub Actions 自动生成
+
+`.github/workflows/enclosure-stl.yml` 会在外壳文件变更的 push、pull request 或手动触发时生成两个 STL，并上传为 `intercom-button-enclosure-stl` 构建产物。产物同时包含 `SHA256SUMS` 校验文件，保留 14 天。
 
 ## 推荐打印设置
 
