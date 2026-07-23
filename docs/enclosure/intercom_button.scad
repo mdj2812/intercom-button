@@ -13,7 +13,9 @@
 $fn = 64;
 
 part = "assembly"; // "assembly", "base", "lid", or "print"
-show_components = false; // Set true for an internal layout check.
+show_components = true;
+assembly_shell_alpha = 0.28;
+selected_part = is_undef(render_part) ? part : render_part;
 
 // Overall enclosure
 case_w = 68;
@@ -62,6 +64,7 @@ esp_y =
     case_d - wall - fit - esp_rear_clearance - esp_l;
 esp_z = 11;
 esp_end_support = 2.2;
+esp_module_overhang = 3.5;
 
 // Separate rear openings leave a center bridge between the two USB ports.
 usb_port_w = 10;
@@ -393,35 +396,40 @@ module mic_pocket() {
             rail_t
         ]);
 
-    // Integral cantilever latch behind the left side of the PCB.
-    // The tapered hook flexes rearward during insertion and returns below
-    // the PCB edge. Keep the opposite side open for removal.
+    // Two integral cantilever latches behind the PCB.
+    // Their tapered hooks flex rearward during insertion and return below
+    // the PCB edge.
     board_bottom = mic_z - mic_h / 2;
     snap_w = 6;
     snap_t = 0.8;
-    snap_hook = 0.7;
+    snap_hook = 1.4;
     snap_hook_h = 1.2;
-    snap_x = mic_board_x - mic_w / 2 + 2;
-    snap_y = slot_back + 0.6;
+    snap_xs = [
+        mic_board_x - mic_w / 2 + 2,
+        mic_board_x + mic_w / 2 - snap_w - 2
+    ];
+    snap_y = slot_back + 0.2;
     snap_bottom = board_bottom - 0.2;
     snap_top = z0 + pocket_h + 0.2;
 
-    translate([snap_x, snap_y, snap_bottom])
-        cube([
-            snap_w,
-            snap_t,
-            snap_top - snap_bottom
-        ]);
+    for (snap_x = snap_xs) {
+        translate([snap_x, snap_y, snap_bottom])
+            cube([
+                snap_w,
+                snap_t,
+                snap_top - snap_bottom
+            ]);
 
-    hull() {
-        translate([
-            snap_x,
-            snap_y - snap_hook,
-            snap_bottom - snap_hook_h
-        ])
-            cube([snap_w, snap_t + snap_hook, 0.2]);
-        translate([snap_x, snap_y, snap_bottom - 0.1])
-            cube([snap_w, snap_t, 0.2]);
+        hull() {
+            translate([
+                snap_x,
+                snap_y - snap_hook,
+                snap_bottom - snap_hook_h
+            ])
+                cube([snap_w, snap_t + snap_hook, 0.2]);
+            translate([snap_x, snap_y, snap_bottom - 0.1])
+                cube([snap_w, snap_t, 0.2]);
+        }
     }
 }
 
@@ -444,51 +452,152 @@ module lid() {
     }
 }
 
-module component_mockups() {
-    // ESP32 PCB and module
-    color([0.05, 0.45, 0.20, 0.65])
-        translate([esp_x - esp_w / 2, esp_y, esp_z])
-            cube([esp_w, esp_l, esp_t]);
-    color([0.65, 0.68, 0.65, 0.75])
-        translate([esp_x - 9, esp_y, esp_z + esp_t])
-            cube([18, 25, 3]);
+module esp32_mockup() {
+    board_x0 = esp_x - esp_w / 2;
+    board_y1 = esp_y + esp_l;
+    module_y = esp_y - esp_module_overhang;
+    header_y = esp_y + 2.5;
+    header_pitch = 2.54;
+    header_count = 22;
+    header_xs = [
+        board_x0 + 1.27,
+        board_x0 + esp_w - 1.27
+    ];
 
-    // MAX9814 PCB, mounted vertically behind the front wall
-    color([0.15, 0.10, 0.55, 0.70])
+    // PCB
+    color([0.04, 0.42, 0.18])
+        translate([board_x0, esp_y, esp_z])
+            cube([esp_w, esp_l, esp_t]);
+
+    // Pin-header plastic and downward pins
+    for (x = header_xs) {
+        color([0.05, 0.05, 0.05])
+            translate([
+                x - 1.0,
+                header_y - 1.0,
+                esp_z + esp_t
+            ])
+                cube([
+                    2.0,
+                    (header_count - 1) * header_pitch + 2.0,
+                    2.4
+                ]);
+
+        for (i = [0 : header_count - 1])
+            color([0.72, 0.72, 0.68])
+                translate([
+                    x,
+                    header_y + i * header_pitch,
+                    esp_z - 6
+                ])
+                    cylinder(h = 8.6, d = 0.65, $fn = 12);
+    }
+
+    // WROOM module: exposed antenna area and shield can
+    color([0.10, 0.17, 0.12])
+        translate([esp_x - 9, module_y, esp_z + esp_t])
+            cube([18, 7, 1.2]);
+    color([0.70, 0.72, 0.70])
+        translate([esp_x - 9, module_y + 7, esp_z + esp_t])
+            cube([18, 18, 3]);
+
+    // Two USB-C receptacles
+    for (x = [
+        esp_x - usb_center_gap / 2 - usb_port_w / 2,
+        esp_x + usb_center_gap / 2 + usb_port_w / 2
+    ])
+        color([0.68, 0.70, 0.72])
+            translate([
+                x - 4.5,
+                board_y1 - 6,
+                esp_z + esp_t
+            ])
+                cube([9, 8, 3.3]);
+}
+
+module mic_mockup() {
+    // PCB
+    color([0.28, 0.08, 0.42])
         translate([
             mic_board_x - mic_w / 2,
             mic_board_y,
             mic_z - mic_h / 2
         ])
             cube([mic_w, mic_t, mic_h]);
-    color([0.12, 0.12, 0.12, 0.80])
+
+    // Electret microphone can and acoustic face
+    color([0.70, 0.71, 0.70])
         translate([mic_x, mic_board_y, mic_z])
             rotate([90, 0, 0])
                 cylinder(h = mic_can_h, d = mic_can_d);
-
-    // Installed button body and cap
-    z_top = front_h + slope * button_y;
-    color([0.08, 0.08, 0.08, 0.75])
-        translate([button_x, button_y, z_top - 19])
-            rotate([slope_angle, 0, 0])
-                cylinder(h = 20, d = 21.5);
-    color([0.1, 0.75, 0.2, 0.80])
-        translate([button_x, button_y, z_top])
-            rotate([slope_angle, 0, 0])
-                cylinder(h = 7, d = button_cap_d);
+    color([0.08, 0.08, 0.08])
+        translate([
+            mic_x,
+            mic_board_y - mic_can_h - 0.15,
+            mic_z
+        ])
+            rotate([90, 0, 0])
+                cylinder(h = 0.3, d = mic_can_d - 0.5);
 }
 
-if (part == "base") {
+module button_mockup() {
+    z_top = front_h + slope * button_y;
+    normal = [0, -sin(slope_angle), cos(slope_angle)];
+    body_depth = 18.9;
+
+    // Threaded barrel below the panel
+    color([0.12, 0.12, 0.12])
+        translate([
+            button_x - normal[0] * body_depth,
+            button_y - normal[1] * body_depth,
+            z_top - normal[2] * body_depth
+        ])
+            rotate([slope_angle, 0, 0])
+                cylinder(h = body_depth, d = 21.8);
+
+    // Retaining nut below the panel
+    color([0.20, 0.20, 0.20])
+        translate([
+            button_x - normal[0] * 4,
+            button_y - normal[1] * 4,
+            z_top - normal[2] * 4
+        ])
+            rotate([slope_angle, 0, 0])
+                cylinder(h = 4, d = 26, $fn = 6);
+
+    // Bezel seated in the top counterbore
+    color([0.12, 0.12, 0.12])
+        translate([button_x, button_y, z_top])
+            rotate([slope_angle, 0, 0])
+                cylinder(h = 3, d = button_cap_d);
+
+    // Moving button cap
+    color([0.10, 0.72, 0.20])
+        translate([
+            button_x + normal[0] * 3,
+            button_y + normal[1] * 3,
+            z_top + normal[2] * 3
+        ])
+            rotate([slope_angle, 0, 0])
+                cylinder(h = 16, d = 24.8);
+}
+
+module component_mockups() {
+    esp32_mockup();
+    mic_mockup();
+    button_mockup();
+}
+
+if (selected_part == "base") {
     base();
-} else if (part == "lid") {
+} else if (selected_part == "lid") {
     lid();
-} else if (part == "print") {
+} else if (selected_part == "print") {
     base();
     translate([case_w + 12, 0, 0]) lid();
 } else {
-    // Keep the shell opaque for a clean exterior preview. Transparency
-    // makes the internal button ring and bosses look like top-surface bumps.
-    color([0.82, 0.84, 0.87]) base();
-    color([0.93, 0.94, 0.96]) lid();
+    shell_alpha = show_components ? assembly_shell_alpha : 1;
+    color([0.82, 0.84, 0.87, shell_alpha]) base();
+    color([0.93, 0.94, 0.96, shell_alpha]) lid();
     if (show_components) component_mockups();
 }

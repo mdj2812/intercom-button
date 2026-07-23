@@ -33,6 +33,10 @@ Keep these three SCAD files in the same directory:
 
 Change dimensions only in the shared file so the base and lid remain synchronized.
 
+### Assembly Preview
+
+Open `intercom_button.scad` with `part = "assembly"`. The default preview renders a translucent enclosure together with dimensioned mockups of the ESP32-S3 board, WROOM antenna module, pin headers, USB-C ports, MAX9814 board and microphone can, and the complete panel-mount button. Set `show_components = false` for an opaque enclosure-only view.
+
 ### GitHub Actions
 
 `.github/workflows/enclosure-stl.yml` generates both STL files when enclosure files change in a push or pull request, or when the workflow is run manually. It uploads an `intercom-button-enclosure-stl` artifact containing the STL files and `SHA256SUMS`, retained for 14 days.
@@ -51,7 +55,7 @@ Change dimensions only in the shared file so the base and lid remain synchronize
 
 1. Place the ESP32 in the base cradle with its USB ports aligned to the rear openings.
 2. Insert the USB end at an angle beneath the center tab between the two USB ports and against the rear stop. Press down the antenna end until the two opposing clips engage the top of the PCB.
-3. Push the MAX9814 upward into the lid rails until the integrated latch engages. Align the microphone can with the grille. To remove it, gently deflect the single latch.
+3. Push the MAX9814 upward into the lid rails until both integrated latches engage. Align the microphone can with the grille. To remove it, gently deflect both latches.
 4. Insert the button through the Ø22.2 mm top opening and secure it with its supplied nut.
 5. Arrange all eight Ø6 × 2 mm magnets and mark their polarities.
 6. Bond the magnets into the Ø6.2 × 2.2 mm blind pockets with epoxy, ensuring that every opposing pair attracts.
