@@ -1,0 +1,51 @@
+name: Enclosure STL
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/enclosure/**.scad'
+      - '.github/workflows/enclosure-stl.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/enclosure/**.scad'
+      - '.github/workflows/enclosure-stl.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OpenSCAD
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq openscad xvfb
+
+      - name: Generate STL files
+        run: |
+          mkdir -p build/enclosure
+          xvfb-run --auto-servernum openscad --hardwarnings \
+            -o build/enclosure/intercom-button-base.stl \
+            docs/enclosure/intercom_button_base.scad
+          xvfb-run --auto-servernum openscad --hardwarnings \
+            -o build/enclosure/intercom-button-lid.stl \
+            docs/enclosure/intercom_button_lid.scad
+          test -s build/enclosure/intercom-button-base.stl
+          test -s build/enclosure/intercom-button-lid.stl
+          sha256sum build/enclosure/*.stl \
+            > build/enclosure/SHA256SUMS
+
+      - name: Upload STL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: intercom-button-enclosure-stl
+          path: build/enclosure/
+          if-no-files-found: error
+          retention-days: 14

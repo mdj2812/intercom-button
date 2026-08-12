@@ -137,7 +137,7 @@ Raw PlatformIO commands (if you prefer):
 
 ### Flash via USB (first time)
 
-1. Connect ESP32-S3 via USB-C
+1. Connect ESP32-S3 via Micro-USB
 2. `make flash`
 3. `make flashfs`   (after editing `data/config.json`)
 
