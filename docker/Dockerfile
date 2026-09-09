@@ -35,16 +35,21 @@ RUN pio platform install "native"
 # ── Copy toolchains + framework from host ───────────
 # Copies whatever packages pio run downloaded — GitHub Actions
 # runner pre-downloads them in the workflow, local dev via pio run.
-# Single glob copy avoids failing on missing optional packages
-# (mkspiffs, openocd, etc.) that pio run doesn't always pull.
 COPY --from=pio-cache packages/ /root/.platformio/packages/
+
+WORKDIR /workspace
+ENV PLATFORMIO_CORE_DIR=/root/.platformio
+
+# Filesystem image tools used by `pio run -t upload` / uploadfs.
+# `pio run` (compile only) does not pull these, so bake them in.
+RUN pio pkg install --global --silent \
+      -t "platformio/tool-mkspiffs@~2.230.0" \
+      -t "platformio/tool-mklittlefs@~1.203.0" \
+      -t "platformio/tool-mkfatfs@~2.0.0"
 
 # ── Verify toolchains ────────────────────────────────
 RUN /root/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-gcc --version && \
-    echo "Toolchain OK"
-
-# ── Workspace ───────────────────────────────────────
-WORKDIR /workspace
-ENV PLATFORMIO_CORE_DIR=/root/.platformio
+    echo "Toolchain OK" && \
+    pio pkg list --global --only-tools
 
 CMD ["/bin/bash"]
