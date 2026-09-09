@@ -300,7 +300,7 @@ void loop() {
                 if (hello.status != DeviceHello::Status::Ok) {
                     unsigned long backoff = hello_backoff_ms;
                     if (hello.status == DeviceHello::Status::Revoked) {
-                        backoff = HELLO_BACKOFF_MAX_MS;
+                        backoff = HELLO_REVOKED_RETRY_MS;
                     } else if (hello.status == DeviceHello::Status::Pending) {
                         backoff = pending_retry_delay();
                     }
@@ -347,8 +347,8 @@ void loop() {
                     Serial.println("[main] Hello heartbeat OK");
                 } else if (hello.status == DeviceHello::Status::Revoked) {
                     hello_ok = false;
-                    hello_backoff_ms = HELLO_BACKOFF_MAX_MS;
-                    next_hello_ms = millis() + HELLO_BACKOFF_MAX_MS;
+                    hello_backoff_ms = HELLO_REVOKED_RETRY_MS;
+                    next_hello_ms = millis() + HELLO_REVOKED_RETRY_MS;
                     Serial.printf("[main] Hello heartbeat: %s — will re-register\n",
                                   hello.error ? hello.error : "blocked");
                 } else if (hello.status == DeviceHello::Status::Pending) {
