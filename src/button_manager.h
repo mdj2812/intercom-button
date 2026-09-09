@@ -2,11 +2,6 @@
 #include <cstdint>
 #include <vector>
 
-// IRAM_ATTR is ESP32-specific; no-op on native
-#ifndef IRAM_ATTR
-#define IRAM_ATTR
-#endif
-
 /// Manages N physical buttons with per-button GPIO interrupt + debounce.
 ///
 /// Each button is active LOW with internal pull-up. GPIO CHANGE interrupts
@@ -77,7 +72,7 @@ private:
         bool long_fired = false;
     };
 
-    static void IRAM_ATTR _isr(void* arg);
+    static void _isr(void* arg);
 
     std::vector<Button> _buttons;
 };
