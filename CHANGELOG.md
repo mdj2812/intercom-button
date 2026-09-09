@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.1] — 2026-09-09
+
+### 🚀 Added
+
+- **Server-triggered OTA** — idle hello with `"ota": true` downloads `GET /api/home_intercom/firmware` over LAN HTTP (GitHub release assets are HTTPS-only). After flash, press any button (or serial `confirm`) within 60s or the image rolls back.
+- **Release signatures** — CI signs the `.bin` with repo secret `OTA_PRIVATE_KEY` and uploads a 64-byte `intercom-button-vX.Y.Z.bin.sig`. A missing `.sig` still flashes using SHA-256 only.
+
+### 🔧 Changed
+
+- OTA public key replaced. Boards still on the previous key must take this image via serial or **unsigned** OTA before they will accept a signed GitHub `.sig`.
+
+### 🏠 Home Intercom (related)
+
+- Requires a server that caches the GitHub `.bin` and sets hello `ota: true` (home-intercom server-triggered OTA).
+
 ## [0.2.0] — 2026-09-09
 
 ### 🔒 Security
