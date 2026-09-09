@@ -7,6 +7,9 @@
 
 // ── HTTP status ─────────────────────────────────────
 #define HTTP_CODE_OK 200
+#define HTTP_CODE_UNAUTHORIZED 401
+#define HTTP_CODE_FORBIDDEN 403
+#define HTTP_CODE_NOT_FOUND 404
 
 // ── Mockable HTTP state ─────────────────────────────
 struct HTTPMockState {
@@ -15,7 +18,9 @@ struct HTTPMockState {
     int connect_error = 0; // < 0 = connection error (timeout, reset)
     std::string last_url;
     std::string last_content_type;
-    std::string last_auth_header; // Authorization header value (if set)
+    std::string last_auth_header;      // Authorization header value (if set)
+    std::string last_device_id_header; // X-Device-ID header value (if set)
+    std::string last_body;             // POST payload (JSON string posts)
     size_t last_body_size = 0;
     int post_call_count = 0;
 };
@@ -47,6 +52,8 @@ public:
             _http_mock.last_content_type = value ? value : "";
         if (name && strcmp(name, "Authorization") == 0)
             _http_mock.last_auth_header = value ? value : "";
+        if (name && strcmp(name, "X-Device-ID") == 0)
+            _http_mock.last_device_id_header = value ? value : "";
     }
 
     void setTimeout(uint32_t ms) {
@@ -55,7 +62,18 @@ public:
 
     int POST(uint8_t* data, size_t len) {
         (void) data;
+        _http_mock.last_body.clear();
         _http_mock.last_body_size = len;
+        _http_mock.post_call_count++;
+
+        if (_http_mock.connect_error != 0)
+            return _http_mock.connect_error;
+        return _http_mock.response_code;
+    }
+
+    int POST(String payload) {
+        _http_mock.last_body = payload.c_str();
+        _http_mock.last_body_size = payload.length();
         _http_mock.post_call_count++;
 
         if (_http_mock.connect_error != 0)

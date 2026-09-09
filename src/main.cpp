@@ -17,6 +17,9 @@
 #include "button_manager.h"
 #include "config.h"
 #include "config_manager.h"
+#include "consts.hpp"
+#include "device_hello.h"
+#include "device_id.h"
 #include "http_uploader.h"
 #include "ota_manager.h"
 #include "room_target_store.h"
@@ -45,6 +48,29 @@ static unsigned long MAX_RECORD_MS = 60000; // updated from config
 static uint8_t active_button_index = 0; // which button triggered recording
 static unsigned long upload_start_ms = 0;
 static unsigned long confirm_deadline_ms = 0; // boot confirmation timeout
+
+static bool hello_ok = false;
+static bool was_wifi_ok = false;
+static unsigned long next_hello_ms = 0;
+static unsigned long hello_backoff_ms = 2000;
+static const unsigned long HELLO_BACKOFF_MAX_MS = 60000;
+
+static DeviceHello::Result send_hello() {
+    return DeviceHello::send(ConfigManager::server_scheme(), ConfigManager::server_host(), ConfigManager::server_port(),
+                             DeviceId::mac(), FIRMWARE_VERSION);
+}
+
+static void on_hello_ok(const DeviceHello::Result& hello) {
+    hello_ok = true;
+    hello_backoff_ms = 2000;
+    next_hello_ms = millis() + HELLO_HEARTBEAT_MS;
+    if (hello.max_record_secs > 0) {
+        MAX_RECORD_MS = hello.max_record_secs * 1000UL;
+    }
+    if (hello.room[0] != '\0') {
+        Serial.printf("[main] Server room=%s (button map still from config/NVS)\n", hello.room);
+    }
+}
 
 // ── LED color constants ────────────────────────────────
 
@@ -94,8 +120,9 @@ void setup() {
     ConfigManager::begin();
     MAX_RECORD_MS = ConfigManager::max_record_secs() * 1000UL;
 
-    Serial.printf("Server: %s://%s:%u | Max: %us\n", ConfigManager::server_scheme(), ConfigManager::server_host(),
-                  ConfigManager::server_port(), ConfigManager::max_record_secs());
+    Serial.printf("Server: %s://%s:%u | Device: %s | Max: %us\n", ConfigManager::server_scheme(),
+                  ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(),
+                  ConfigManager::max_record_secs());
 
     // ── Per-button room mapping (NVS + config.json) ─
     if (!room_store.begin()) {
@@ -188,23 +215,77 @@ void loop() {
     switch (state) {
 
         case State::IDLE: {
+            if (wifi_ok && !was_wifi_ok) {
+                next_hello_ms = 0;
+                hello_backoff_ms = 2000;
+            }
+            if (!wifi_ok) {
+                hello_ok = false;
+            }
+            was_wifi_ok = wifi_ok;
+
             if (!wifi_ok) {
                 led_blink(C_RED, 500);
-            } else {
-                led_set(C_GREEN);
+                break;
             }
 
-            // PTT triggers on PRESS (immediate) for responsive UX.
+            if (!hello_ok) {
+                led_blink(C_ORANGE, 800);
+                if (millis() < next_hello_ms)
+                    break;
+
+                DeviceHello::Result hello = send_hello();
+
+                if (hello.status != DeviceHello::Status::Ok) {
+                    unsigned long backoff = hello_backoff_ms;
+                    if (hello.status == DeviceHello::Status::Revoked)
+                        backoff = HELLO_BACKOFF_MAX_MS;
+                    next_hello_ms = millis() + backoff;
+                    if (hello_backoff_ms < HELLO_BACKOFF_MAX_MS)
+                        hello_backoff_ms = hello_backoff_ms * 2;
+                    if (hello_backoff_ms > HELLO_BACKOFF_MAX_MS)
+                        hello_backoff_ms = HELLO_BACKOFF_MAX_MS;
+                    Serial.printf("[main] Hello failed (%s) — retry in %lu ms\n", hello.error ? hello.error : "error",
+                                  backoff);
+                    break;
+                }
+
+                on_hello_ok(hello);
+            }
+
+            led_set(C_GREEN);
+
+            // PTT wins over a due heartbeat — do not delay talk with a hello POST.
             // Single-threaded loop(): no race on active_button_index —
             // ButtonManager::poll() runs synchronously, ISR only touches
             // volatile flags inside ButtonManager.
-            if (event.type == ButtonManager::EventType::PRESS && wifi_ok) {
+            if (event.type == ButtonManager::EventType::PRESS) {
                 active_button_index = event.button_index;
                 recorder.start();
                 record_start_ms = millis();
                 led_set(C_BLUE);
                 state = State::RECORDING;
                 Serial.printf("[main] Recording for GPIO%u...\n", active_pins[active_button_index]);
+                break;
+            }
+
+            if (millis() >= next_hello_ms) {
+                DeviceHello::Result hello = send_hello();
+                if (hello.status == DeviceHello::Status::Ok) {
+                    on_hello_ok(hello);
+                    Serial.println("[main] Hello heartbeat OK");
+                } else if (hello.status == DeviceHello::Status::Revoked ||
+                           hello.status == DeviceHello::Status::Pending) {
+                    hello_ok = false;
+                    hello_backoff_ms = HELLO_BACKOFF_MAX_MS;
+                    next_hello_ms = millis() + HELLO_BACKOFF_MAX_MS;
+                    Serial.printf("[main] Hello heartbeat: %s — will re-register\n",
+                                  hello.error ? hello.error : "blocked");
+                } else {
+                    next_hello_ms = millis() + HELLO_HEARTBEAT_RETRY_MS;
+                    Serial.printf("[main] Hello heartbeat failed (%s) — retry in %lu ms\n",
+                                  hello.error ? hello.error : "error", HELLO_HEARTBEAT_RETRY_MS);
+                }
             }
             break;
         }
@@ -255,7 +336,7 @@ void loop() {
 
             bool ok = HTTPUploader::upload(recorder.data(), recorder.total_bytes(), ConfigManager::server_scheme(),
                                            ConfigManager::server_host(), ConfigManager::server_port(), room.c_str(),
-                                           ConfigManager::ha_token());
+                                           DeviceId::mac());
 
             unsigned long upload_ms = millis() - upload_start_ms;
             Serial.printf("[main] Upload to %s %s (%lu ms)\n", room.c_str(), ok ? "OK" : "FAILED", upload_ms);

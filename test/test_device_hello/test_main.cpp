@@ -1,0 +1,113 @@
+/// Unit tests for DeviceHello through mocks.
+
+#include "device_hello.h"
+#include <Arduino.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <unity.h>
+
+static const char* DEVICE_MAC = "AA:BB:CC:DD:EE:FF";
+
+void setUp(void) {
+    mock_http_reset();
+    mock_set_millis(0);
+    _secure_client_insecure = false;
+}
+
+void tearDown(void) {
+    mock_http_reset();
+}
+
+void test_hello_success_parses_payload(void) {
+    mock_http_set_response(200, R"({
+        "status": "ok",
+        "device_name": "Study Button",
+        "room": "study",
+        "sample_rate": 16000,
+        "max_record_secs": 60
+    })");
+
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.1.0");
+
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Ok), static_cast<int>(r.status));
+    TEST_ASSERT_EQUAL_STRING("Study Button", r.device_name);
+    TEST_ASSERT_EQUAL_STRING("study", r.room);
+    TEST_ASSERT_EQUAL(16000, r.sample_rate);
+    TEST_ASSERT_EQUAL(60, r.max_record_secs);
+    TEST_ASSERT_EQUAL_STRING("http://ha.local:8123/api/home_intercom/devices/hello", _http_mock.last_url.c_str());
+    TEST_ASSERT_EQUAL_STRING(DEVICE_MAC, _http_mock.last_device_id_header.c_str());
+    TEST_ASSERT_EQUAL_STRING("application/json", _http_mock.last_content_type.c_str());
+    TEST_ASSERT_TRUE(_http_mock.last_body.find("\"firmware_version\":\"0.1.0\"") != std::string::npos);
+    TEST_ASSERT_EQUAL(1, _http_mock.post_call_count);
+}
+
+void test_hello_missing_device_id_does_not_post(void) {
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, "", "0.1.0");
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Error), static_cast<int>(r.status));
+    TEST_ASSERT_EQUAL(0, _http_mock.post_call_count);
+}
+
+void test_hello_null_device_id_does_not_post(void) {
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, nullptr, "0.1.0");
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Error), static_cast<int>(r.status));
+    TEST_ASSERT_EQUAL(0, _http_mock.post_call_count);
+}
+
+void test_hello_revoked_is_403(void) {
+    mock_http_set_response(HTTP_CODE_FORBIDDEN, R"({"status":"error","error":"device revoked"})");
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.1.0");
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Revoked), static_cast<int>(r.status));
+}
+
+void test_hello_pending_status(void) {
+    mock_http_set_response(200, R"({"status":"pending"})");
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.1.0");
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Pending), static_cast<int>(r.status));
+}
+
+void test_hello_http_error(void) {
+    mock_http_set_response(500, "Internal Server Error");
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.1.0");
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Error), static_cast<int>(r.status));
+}
+
+void test_hello_connection_error(void) {
+    mock_http_set_error(-11);
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.1.0");
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Error), static_cast<int>(r.status));
+}
+
+void test_hello_invalid_json(void) {
+    mock_http_set_response(200, "{broken");
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.1.0");
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Error), static_cast<int>(r.status));
+}
+
+void test_hello_status_error_body(void) {
+    mock_http_set_response(200, R"({"status":"error","error":"device registry unavailable"})");
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.1.0");
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Error), static_cast<int>(r.status));
+}
+
+void test_hello_https_scheme(void) {
+    mock_http_set_response(200, R"({"status":"ok","device_name":"Btn","room":""})");
+    DeviceHello::Result r = DeviceHello::send("https", "ha.example.com", 443, DEVICE_MAC, "0.1.0");
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Ok), static_cast<int>(r.status));
+    TEST_ASSERT_EQUAL_STRING("https://ha.example.com:443/api/home_intercom/devices/hello", _http_mock.last_url.c_str());
+    TEST_ASSERT_TRUE(_secure_client_insecure);
+}
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_hello_success_parses_payload);
+    RUN_TEST(test_hello_missing_device_id_does_not_post);
+    RUN_TEST(test_hello_null_device_id_does_not_post);
+    RUN_TEST(test_hello_revoked_is_403);
+    RUN_TEST(test_hello_pending_status);
+    RUN_TEST(test_hello_http_error);
+    RUN_TEST(test_hello_connection_error);
+    RUN_TEST(test_hello_invalid_json);
+    RUN_TEST(test_hello_status_error_body);
+    RUN_TEST(test_hello_https_scheme);
+    return UNITY_END();
+}

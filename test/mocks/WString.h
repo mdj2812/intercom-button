@@ -26,6 +26,10 @@ public:
         for (char& c : _s)
             c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
+    void toUpperCase() {
+        for (char& c : _s)
+            c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
 
     String& operator=(const char* s) {
         _s = s ? s : "";

@@ -22,6 +22,7 @@ struct WiFiState {
     int rssi = 0;
     bool auto_reconnect = false;
     const char* ssid = "";
+    const char* mac = "AA:BB:CC:DD:EE:FF";
     int mode = 0;
 };
 inline WiFiState _wifi_mock;
@@ -42,6 +43,10 @@ inline void mock_wifi_set_status(int status) {
     _wifi_mock.status = status;
 }
 
+inline void mock_wifi_set_mac(const char* mac) {
+    _wifi_mock.mac = mac ? mac : "";
+}
+
 // ── WiFi class ──────────────────────────────────────
 class WiFiClass {
 public:
@@ -58,6 +63,7 @@ public:
     int status() { return _wifi_mock.status; }
     void reconnect() { /* tests control connection via mock_wifi_set_connected */ }
     int RSSI() { return _wifi_mock.rssi; }
+    String macAddress() { return String(_wifi_mock.mac); }
 };
 
 inline WiFiClass WiFi;

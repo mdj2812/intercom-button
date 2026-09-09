@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### 🔒 Security
+
+- **MAC-based device identity (#31)** — uploads and OTA requests send `X-Device-ID: <STA MAC>` and POST audio to `/api/home_intercom/device/record`. `ha_token` is no longer read or sent; a leftover key in existing `config.json` is ignored. HTTP 401/403 are treated as auth failures (no retry, no assumed delivery).
+- **Trust-on-first-use hello (#32)** — after WiFi connects, `POST /api/home_intercom/devices/hello` registers the MAC. Recording waits until hello succeeds (orange LED). While idle, hello repeats every 10 seconds to refresh HA last_seen (5-minute Online window). Revoked/pending heartbeats return to the orange wait; a network blip retries in 30s without dropping registration. Audio `max_record_secs` from the payload is applied; per-button rooms stay local until #28.
+
 ## [0.1.0] — 2026-07-16
 
 ### 🚀 Added

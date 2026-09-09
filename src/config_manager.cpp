@@ -16,7 +16,6 @@ static constexpr const char* KEY_SERVER_PORT = "server_port";
 static constexpr const char* KEY_SAMPLE_RATE = "sample_rate";
 static constexpr const char* KEY_MAX_RECORD_SECS = "max_record_secs";
 static constexpr const char* KEY_BUTTONS = "buttons";
-static constexpr const char* KEY_HA_TOKEN = "ha_token";
 
 // JSON document size: base fields + MAX_BUTTONS × (pins entry + buttons entry + overhead)
 static constexpr size_t JSON_BASE = 256;   // wifi, server, room, audio fields
@@ -37,9 +36,6 @@ struct Config {
     uint8_t button_pins[MAX_BUTTONS] = {};
     String button_rooms[MAX_BUTTONS];
     uint8_t button_count = 0;
-
-    // HA auth token (empty = no auth header)
-    String ha_token;
 };
 static Config cfg;
 
@@ -88,8 +84,6 @@ bool ConfigManager::begin() {
         cfg.sample_rate = doc[KEY_SAMPLE_RATE].as<uint32_t>();
     if (doc.containsKey(KEY_MAX_RECORD_SECS))
         cfg.max_secs = doc[KEY_MAX_RECORD_SECS].as<uint32_t>();
-    if (doc.containsKey(KEY_HA_TOKEN))
-        cfg.ha_token = doc[KEY_HA_TOKEN].as<String>();
 
     // ── Parse per-button room mappings ────────────
     if (doc.containsKey(KEY_BUTTONS)) {
@@ -125,9 +119,6 @@ const char* ConfigManager::server_host() {
 }
 uint16_t ConfigManager::server_port() {
     return cfg.server_port;
-}
-const char* ConfigManager::ha_token() {
-    return cfg.ha_token.c_str();
 }
 uint32_t ConfigManager::sample_rate() {
     return cfg.sample_rate;
