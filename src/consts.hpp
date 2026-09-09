@@ -14,7 +14,7 @@ constexpr uint8_t MAX_ROOM_KEY_LEN = 32;
 constexpr uint8_t MAX_DEVICE_NAME_LEN = 64;
 
 /// Reported to the server in POST /devices/hello.
-constexpr const char* FIRMWARE_VERSION = "0.1.0";
+constexpr const char* FIRMWARE_VERSION = "0.2.0";
 
 /// Re-hello while idle so HA last_seen stays inside the 5-minute online window.
 constexpr unsigned long HELLO_HEARTBEAT_MS = 10000;

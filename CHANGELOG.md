@@ -1,17 +1,33 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.0] — 2026-09-09
 
 ### 🔒 Security
 
 - **MAC-based device identity (#31)** — uploads and OTA requests send `X-Device-ID: <STA MAC>` and POST audio to `/api/home_intercom/device/record`. `ha_token` is no longer read or sent; a leftover key in existing `config.json` is ignored. HTTP 401/403 are treated as auth failures (no retry, no assumed delivery).
-- **Trust-on-first-use hello (#32)** — after WiFi connects, `POST /api/home_intercom/devices/hello` registers the MAC. Recording waits until hello succeeds (orange LED). While idle, hello repeats every 10 seconds to refresh HA last_seen (5-minute Online window). Revoked/pending heartbeats return to the orange wait; a network blip retries in 30s without dropping registration. Audio `max_record_secs` from the payload is applied.
+- **Trust-on-first-use hello (#32)** — after WiFi connects, `POST /api/home_intercom/devices/hello` registers the MAC. Recording waits until hello succeeds (orange LED). While idle, hello repeats every 10 seconds to refresh HA last_seen. Revoked/pending heartbeats return to the orange wait; a network blip retries in 30s without dropping registration. Audio `max_record_secs` from the payload is applied.
 
 ### 🔧 Changed
 
-- **Server-driven room map (#28)** — after a successful hello, `GET /api/home_intercom/rooms` assigns `pin[i]` → catalog key `[i]` (JSON document order) into NVS. Fetch failure keeps the last NVS map (then the compiled GPIO→room fallback). Optional `pins` array; leftover `buttons` in `config.json` is ignored.
+- **Server-driven room map (#28, #40)** — after a successful hello, `GET /api/home_intercom/rooms` assigns `pin[i]` → catalog key `[i]` (JSON document order) into NVS. Fetch failure keeps the last NVS map (then the compiled GPIO→room fallback). Optional `pins` array; leftover `buttons` in `config.json` is ignored.
 - **Drop `buttons` from config** — GPIO→room is no longer set in `config.json`. Hardware GPIOs stay in `pins`; room keys come from the server.
 - Revoked hello retries every 30 seconds.
+- Pending pairing blinks orange on a side task so blocking HTTP still flashes.
+
+### 📖 Documentation
+
+- Parametric printable enclosure (OpenSCAD) with BOM and CI-generated STLs (#35)
+- Demo video/GIF in the README (#33)
+
+### 🧪 Tests
+
+- Native `RoomFetcher` tests for catalog parse and pin-index apply
+- Leftover `buttons` object in config is ignored
+
+### 🏠 Home Intercom (related)
+
+- Requires a server that serves `POST /api/home_intercom/devices/hello` and `GET /api/home_intercom/rooms` (home-intercom v2.1.x).
+- Per-device GPIO → room map (not catalog order) is [home-intercom#78](https://github.com/mdj2812/home-intercom/issues/78) / [#39](https://github.com/mdj2812/intercom-button/issues/39).
 
 ## [0.1.0] — 2026-07-16
 
