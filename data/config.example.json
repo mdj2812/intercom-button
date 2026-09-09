@@ -1,5 +1,5 @@
 {
-    "_comment": "pins = hardware GPIOs. After hello, GET /rooms assigns pin[i] → room key[i]. buttons = optional offline fallback. Device identity is the Wi-Fi MAC (X-Device-ID).",
+    "_comment": "pins = hardware GPIOs. After hello, GET /rooms assigns pin[i] → room key[i]. Device identity is the Wi-Fi MAC (X-Device-ID).",
     "wifi_ssid": "your_wifi_ssid",
     "wifi_password": "your_wifi_password",
     "server_scheme": "http",
@@ -7,11 +7,5 @@
     "server_port": 8123,
     "sample_rate": 16000,
     "max_record_secs": 60,
-    "pins": [4, 5, 12, 13],
-    "buttons": {
-        "4": "study",
-        "5": "living",
-        "12": "cinema",
-        "13": "bedroom"
-    }
+    "pins": [4, 5, 12, 13]
 }

@@ -182,11 +182,10 @@ void setup() {
                   ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(),
                   ConfigManager::max_record_secs());
 
-    // ── Per-button rooms: NVS + optional config.json fallback ─
+    // ── Per-button rooms: NVS (filled by GET /rooms after hello) ─
     if (!room_store.begin()) {
         Serial.println("[main] NVS init failed — using defaults");
     }
-    ConfigManager::load_button_defaults(room_store);
 
     if (ConfigManager::active_pin_count() > 0) {
         active_pins = ConfigManager::active_pins();

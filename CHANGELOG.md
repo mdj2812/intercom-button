@@ -9,7 +9,9 @@
 
 ### 🔧 Changed
 
-- **Server-driven room map (#28)** — after a successful hello, `GET /api/home_intercom/rooms` assigns `pin[i]` → catalog key `[i]` (JSON document order) into NVS. Fetch failure keeps the last NVS/config map. Optional `pins` array; `buttons` is an offline fallback.
+- **Server-driven room map (#28)** — after a successful hello, `GET /api/home_intercom/rooms` assigns `pin[i]` → catalog key `[i]` (JSON document order) into NVS. Fetch failure keeps the last NVS map (then the compiled GPIO→room fallback). Optional `pins` array; leftover `buttons` in `config.json` is ignored.
+- **Drop `buttons` from config** — GPIO→room is no longer set in `config.json`. Hardware GPIOs stay in `pins`; room keys come from the server.
+- Revoked hello retries every 30 seconds.
 
 ## [0.1.0] — 2026-07-16
 
