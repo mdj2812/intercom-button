@@ -14,7 +14,7 @@ constexpr uint8_t MAX_ROOM_KEY_LEN = 32;
 constexpr const char* FIRMWARE_VERSION = "0.1.0";
 
 /// Re-hello while idle so HA last_seen stays inside the 5-minute online window.
-constexpr unsigned long HELLO_HEARTBEAT_MS = 120000;
+constexpr unsigned long HELLO_HEARTBEAT_MS = 10000;
 
 /// Transient heartbeat failure (timeout / 5xx): stay registered, retry sooner.
 constexpr unsigned long HELLO_HEARTBEAT_RETRY_MS = 30000;
