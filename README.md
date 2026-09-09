@@ -40,7 +40,6 @@ The same firmware binary works for all rooms — just upload a different config 
     "server_scheme": "http",
     "server_host": "192.168.99.4",
     "server_port": 8123,
-    "ha_token": "",
     "sample_rate": 16000,
     "max_record_secs": 60,
     "buttons": {
@@ -57,14 +56,13 @@ The same firmware binary works for all rooms — just upload a different config 
 | `server_scheme` | `http` for a trusted LAN; `https` for remote HA. HTTPS traffic is encrypted, but this firmware currently does not verify the server certificate. |
 | `server_host` | Home Assistant IP (or Docker host for legacy mode) |
 | `server_port` | `8123` for HA integration, `8764` for legacy Docker |
-| `ha_token` | HA Long-Lived Access Token. **Leave empty** for Docker mode. For HA mode, [create a restricted token](https://www.home-assistant.io/docs/authentication/#your-account-profile) with minimal permissions — never use your admin token. The token is stored in plaintext on the ESP32 flash; if the device is physically compromised, revoke it from the HA UI. |
 | `buttons` | Per-GPIO-pin room target defaults. Keys are GPIO numbers, values are room IDs from `rooms.json` (`study`, `living`, `cinema`, `bedroom`, or `all` for broadcast). |
 | `sample_rate` | Audio sample rate in Hz (default: 16000) |
 | `max_record_secs` | Maximum recording duration in seconds (default: 60) |
 
-Copy `data/config.example.json` to `data/config.json` and fill in your settings. `data/config.json` is gitignored — credentials stay local.
+Copy `data/config.example.json` to `data/config.json` and fill in your settings. `data/config.json` is gitignored — WiFi credentials stay local.
 
-When `ha_token` is set, the `Authorization: *** header is added. Without a token, no auth header is sent (Docker-compatible).
+The device identifies itself with its Wi-Fi MAC (`X-Device-ID`) on `/api/home_intercom/device/record`. No Home Assistant token is stored on the ESP32. Unknown or revoked MACs receive HTTP 403; revoke a lost device from the HA UI.
 
 **Multi-button setup**: flash firmware once, then for each device edit `data/config.json` (change `buttons` mapping) and run `pio run -e esp32-s3-devkitc-1 -t uploadfs`.
 
@@ -212,6 +210,7 @@ intercom-button/
 │   ├── test_config/         # Config parsing tests
 │   ├── test_config_manager/ # Config manager tests
 │   ├── test_http_uploader/  # HTTP upload tests
+│   ├── test_device_id/      # MAC identity tests
 │   ├── test_wifi_manager/   # WiFi manager tests
 │   ├── test_button_manager/ # Button manager tests
 │   └── test_room_target_store/ # Room store tests
@@ -222,7 +221,8 @@ intercom-button/
     ├── config_manager.h/cpp # JSON config loader (LittleFS)
     ├── wifi_manager.h/cpp   # Non-blocking WiFi + auto-reconnect
     ├── audio_recorder.h/cpp # 16kHz timer ISR → PSRAM → WAV
-    ├── http_uploader.h/cpp  # POST /record?target=<room>
+    ├── http_uploader.h/cpp  # POST /device/record?target=<room>
+    ├── device_id.h/cpp      # STA MAC → X-Device-ID
     ├── button_manager.h/cpp # Multi-button GPIO matrix + debounce
     ├── room_target_store.h/cpp # NVS room target storage
     └── ota_manager.h/cpp    # OTA firmware update (optional)

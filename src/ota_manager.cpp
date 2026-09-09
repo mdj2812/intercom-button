@@ -6,6 +6,7 @@
 #include "ota_manager.h"
 
 #include "config_manager.h"
+#include "device_id.h"
 #include "wifi_manager.h"
 
 #include <Arduino.h>
@@ -86,8 +87,8 @@ bool download_and_flash() {
         sig_client.setTimeout(5000);
         if (sig_client.connect(host, port)) {
             String sig_path = String(s_firmware_path) + ".sig";
-            sig_client.printf("GET %s HTTP/1.0\r\nHost: %s:%u\r\nConnection: close\r\n\r\n", sig_path.c_str(), host,
-                              port);
+            sig_client.printf("GET %s HTTP/1.0\r\nHost: %s:%u\r\nX-Device-ID: %s\r\nConnection: close\r\n\r\n",
+                              sig_path.c_str(), host, port, DeviceId::mac());
 
             // Skip headers
             String hdr_line;
@@ -142,6 +143,7 @@ bool download_and_flash() {
     // ── HTTP GET request ──────────────────────────────────
     client.printf("GET %s HTTP/1.0\r\n", s_firmware_path);
     client.printf("Host: %s:%u\r\n", host, port);
+    client.printf("X-Device-ID: %s\r\n", DeviceId::mac());
     client.print("Connection: close\r\n");
     client.print("\r\n");
 

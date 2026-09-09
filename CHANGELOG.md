@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### 🔒 Security
+
+- **MAC-based device identity (#31)** — uploads and OTA requests send `X-Device-ID: <STA MAC>` and POST audio to `/api/home_intercom/device/record`. `ha_token` is no longer read or sent; a leftover key in existing `config.json` is ignored. HTTP 401/403 are treated as auth failures (no retry, no assumed delivery).
+
 ## [0.1.0] — 2026-07-16
 
 ### 🚀 Added

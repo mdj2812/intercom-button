@@ -17,6 +17,7 @@
 #include "button_manager.h"
 #include "config.h"
 #include "config_manager.h"
+#include "device_id.h"
 #include "http_uploader.h"
 #include "ota_manager.h"
 #include "room_target_store.h"
@@ -94,8 +95,9 @@ void setup() {
     ConfigManager::begin();
     MAX_RECORD_MS = ConfigManager::max_record_secs() * 1000UL;
 
-    Serial.printf("Server: %s://%s:%u | Max: %us\n", ConfigManager::server_scheme(), ConfigManager::server_host(),
-                  ConfigManager::server_port(), ConfigManager::max_record_secs());
+    Serial.printf("Server: %s://%s:%u | Device: %s | Max: %us\n", ConfigManager::server_scheme(),
+                  ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(),
+                  ConfigManager::max_record_secs());
 
     // ── Per-button room mapping (NVS + config.json) ─
     if (!room_store.begin()) {
@@ -255,7 +257,7 @@ void loop() {
 
             bool ok = HTTPUploader::upload(recorder.data(), recorder.total_bytes(), ConfigManager::server_scheme(),
                                            ConfigManager::server_host(), ConfigManager::server_port(), room.c_str(),
-                                           ConfigManager::ha_token());
+                                           DeviceId::mac());
 
             unsigned long upload_ms = millis() - upload_start_ms;
             Serial.printf("[main] Upload to %s %s (%lu ms)\n", room.c_str(), ok ? "OK" : "FAILED", upload_ms);

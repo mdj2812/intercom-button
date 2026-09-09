@@ -1,27 +1,26 @@
 #include "http_uploader.h"
+#include <Arduino.h>
 #include <HTTPClient.h>
-#include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 #include <cstring>
 #include <sstream>
 
 static const char* TAG = "upload";
+static const char* RECORD_PATH = "/api/home_intercom/device/record";
 
 bool HTTPUploader::upload(const uint8_t* data, size_t size, const char* server_scheme, const char* server_host,
-                          uint16_t server_port, const char* room_target, const char* ha_token) {
+                          uint16_t server_port, const char* room_target, const char* device_id) {
     if (!data || size == 0) {
         Serial.printf("[%s] No data to upload\n", TAG);
         return false;
     }
 
     const bool use_https = server_scheme && strcmp(server_scheme, "https") == 0;
-    const bool use_ha_auth = ha_token && ha_token[0] != '\0';
-    const char* endpoint = "/api/home_intercom/record";
 
     // std::ostringstream — type-safe URL construction, no printf format-string issues.
     std::ostringstream oss;
-    oss << (use_https ? "https" : "http") << "://" << server_host << ":" << server_port << endpoint
+    oss << (use_https ? "https" : "http") << "://" << server_host << ":" << server_port << RECORD_PATH
         << "?target=" << room_target;
     std::string url_str = oss.str();
     const char* url = url_str.c_str();
@@ -47,10 +46,8 @@ bool HTTPUploader::upload(const uint8_t* data, size_t size, const char* server_s
         }
 
         http.addHeader("Content-Type", "audio/wav");
-        if (use_ha_auth) {
-            String auth = "Bearer ";
-            auth += ha_token;
-            http.addHeader("Authorization", auth.c_str());
+        if (device_id && device_id[0] != '\0') {
+            http.addHeader("X-Device-ID", device_id);
         }
         http.setTimeout(60000); // 60 seconds (Arduino-ESP32 v3: ms, not s)
 
@@ -66,6 +63,10 @@ bool HTTPUploader::upload(const uint8_t* data, size_t size, const char* server_s
                 return true;
             }
             Serial.printf("[%s] HTTP 200 but not ok: %s\n", TAG, body.c_str());
+        } else if (code == HTTP_CODE_UNAUTHORIZED || code == HTTP_CODE_FORBIDDEN) {
+            Serial.printf("[%s] HTTP %d — device not authorized\n", TAG, code);
+            http.end();
+            return false;
         } else if (code > 0) {
             Serial.printf("[%s] HTTP %d — %s\n", TAG, code, http.errorToString(code).c_str());
         } else {
