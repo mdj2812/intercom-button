@@ -70,8 +70,16 @@ for dev in /dev/ttyUSB* /dev/ttyACM*; do
     [ -e "$dev" ] && USB_DEV="$dev" && break
 done
 DEVICE_FLAG=""
-[ -n "$USB_DEV" ] && DEVICE_FLAG="--device=$USB_DEV" && echo "USB: $USB_DEV"
-[ -z "$USB_DEV" ] && echo "⚠️  No USB device found — upload won't work"
+PIO_PORT_ENV=()
+if [ -n "$USB_DEV" ]; then
+    DEVICE_FLAG="--device=$USB_DEV"
+    # Override platformio.ini so monitor/upload use the node we mounted
+    # (often ttyACM1, not ttyACM0).
+    PIO_PORT_ENV=(-e "PLATFORMIO_UPLOAD_PORT=$USB_DEV" -e "PLATFORMIO_MONITOR_PORT=$USB_DEV")
+    echo "USB: $USB_DEV"
+else
+    echo "⚠️  No USB device found — upload won't work"
+fi
 
 # ── Run ─────────────────────────────────────────────
 # `pio device monitor` (miniterm) needs a TTY for termios. Pass -it when
@@ -85,6 +93,7 @@ if [ $# -eq 0 ]; then
     exec docker run --rm -it \
         --network host \
         $DEVICE_FLAG \
+        "${PIO_PORT_ENV[@]}" \
         -v "$PROJECT_ROOT:/workspace" \
         "$IMAGE" \
         /bin/bash
@@ -92,6 +101,7 @@ else
     exec docker run --rm "${RUN_TTY[@]}" \
         --network host \
         $DEVICE_FLAG \
+        "${PIO_PORT_ENV[@]}" \
         -v "$PROJECT_ROOT:/workspace" \
         "$IMAGE" \
         "$@"

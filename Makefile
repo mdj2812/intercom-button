@@ -39,7 +39,7 @@ flashfs:
 	$(PIO) run -e $(ENV) -t uploadfs
 
 monitor:
-	$(PIO) device monitor
+	$(PIO) device monitor -e $(ENV)
 
 test:
 	$(PIO) test -e native -v
@@ -103,4 +103,4 @@ docker-check:
 	./docker/dev.sh $(PIO) check -e $(ENV) --fail-on-defect=high --skip-packages
 
 docker-monitor:
-	./docker/dev.sh $(PIO) device monitor
+	./docker/dev.sh $(PIO) device monitor -e $(ENV)
