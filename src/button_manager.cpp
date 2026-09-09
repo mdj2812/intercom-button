@@ -1,6 +1,10 @@
 #include "button_manager.h"
 #include <Arduino.h>
 
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
+
 // ── Static ISR trampoline ─────────────────────────────
 
 void IRAM_ATTR ButtonManager::_isr(void* arg) {

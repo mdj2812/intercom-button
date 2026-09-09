@@ -98,6 +98,32 @@ void test_legacy_ha_token_is_ignored() {
     TEST_ASSERT_EQUAL_STRING("TokenWiFi", ConfigManager::wifi_ssid());
 }
 
+void test_pins_array_selects_gpios() {
+    inject_and_load(R"({
+        "wifi_ssid": "PinWiFi",
+        "pins": [4, 5, 12]
+    })");
+
+    TEST_ASSERT_EQUAL(3, ConfigManager::active_pin_count());
+    TEST_ASSERT_EQUAL(4, ConfigManager::active_pins()[0]);
+    TEST_ASSERT_EQUAL(5, ConfigManager::active_pins()[1]);
+    TEST_ASSERT_EQUAL(12, ConfigManager::active_pins()[2]);
+}
+
+void test_legacy_buttons_object_is_ignored() {
+    inject_and_load(R"({
+        "wifi_ssid": "BtnWiFi",
+        "pins": [4, 5, 12],
+        "buttons": {"4": "garage", "5": "office"}
+    })");
+
+    TEST_ASSERT_EQUAL_STRING("BtnWiFi", ConfigManager::wifi_ssid());
+    TEST_ASSERT_EQUAL(3, ConfigManager::active_pin_count());
+    TEST_ASSERT_EQUAL(4, ConfigManager::active_pins()[0]);
+    TEST_ASSERT_EQUAL(5, ConfigManager::active_pins()[1]);
+    TEST_ASSERT_EQUAL(12, ConfigManager::active_pins()[2]);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_full_config);
@@ -106,5 +132,7 @@ int main() {
     RUN_TEST(test_invalid_json_keeps_previous_values);
     RUN_TEST(test_missing_file_keeps_prior_state);
     RUN_TEST(test_legacy_ha_token_is_ignored);
+    RUN_TEST(test_pins_array_selects_gpios);
+    RUN_TEST(test_legacy_buttons_object_is_ignored);
     return UNITY_END();
 }

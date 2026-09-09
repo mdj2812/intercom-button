@@ -1,8 +1,6 @@
 #pragma once
 #include <cstdint>
 
-class RoomTargetStore;
-
 /// Runtime configuration loaded from LittleFS /config.json.
 /// Call ConfigManager::begin() once in setup(), then use the accessors.
 namespace ConfigManager {
@@ -22,13 +20,9 @@ uint16_t server_port();
 uint32_t sample_rate();
 uint32_t max_record_secs();
 
-/// Populate RoomTargetStore config-file defaults from config.json "buttons" field.
-/// Call after begin() and room_store.begin().
-void load_button_defaults(RoomTargetStore& store);
-
-/// Active GPIO pins from config.json "pins" array (decides which GPIOs to initialize).
-/// Distinct from the "buttons" mapping — pins = which GPIOs, buttons = what room per GPIO.
-/// Falls back to compiled-in defaults if not configured.
+/// Active GPIO pins from config.json "pins" array.
+/// Room targets come from the server; these pins are hardware-only.
+/// A leftover "buttons" object in config.json is ignored.
 const uint8_t* active_pins();
 uint8_t active_pin_count();
 

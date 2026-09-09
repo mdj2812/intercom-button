@@ -1,6 +1,5 @@
 #include "config_manager.h"
 #include "consts.hpp"
-#include "room_target_store.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
@@ -15,12 +14,12 @@ static constexpr const char* KEY_SERVER_HOST = "server_host";
 static constexpr const char* KEY_SERVER_PORT = "server_port";
 static constexpr const char* KEY_SAMPLE_RATE = "sample_rate";
 static constexpr const char* KEY_MAX_RECORD_SECS = "max_record_secs";
-static constexpr const char* KEY_BUTTONS = "buttons";
+static constexpr const char* KEY_PINS = "pins";
 
-// JSON document size: base fields + MAX_BUTTONS × (pins entry + buttons entry + overhead)
-static constexpr size_t JSON_BASE = 256;   // wifi, server, room, audio fields
-static constexpr size_t JSON_PER_BTN = 50; // one "pins" int + one "buttons" KV pair + overhead
-static constexpr size_t JSON_DOC_SIZE = JSON_BASE + MAX_BUTTONS * JSON_PER_BTN; // 656 for 8 buttons
+// JSON document size: base fields + pin array + slack for leftover keys (e.g. "buttons")
+static constexpr size_t JSON_BASE = 256;   // wifi, server, audio fields
+static constexpr size_t JSON_PER_PIN = 50; // pin entry + leftover-key slack
+static constexpr size_t JSON_DOC_SIZE = JSON_BASE + MAX_BUTTONS * JSON_PER_PIN;
 
 // ── Default values (used when config.json is missing) ─
 struct Config {
@@ -32,9 +31,8 @@ struct Config {
     uint32_t sample_rate = 16000;
     uint32_t max_secs = 60;
 
-    // Per-button room mappings from config.json "buttons" field
+    // Hardware pins from "pins"
     uint8_t button_pins[MAX_BUTTONS] = {};
-    String button_rooms[MAX_BUTTONS];
     uint8_t button_count = 0;
 };
 static Config cfg;
@@ -85,20 +83,19 @@ bool ConfigManager::begin() {
     if (doc.containsKey(KEY_MAX_RECORD_SECS))
         cfg.max_secs = doc[KEY_MAX_RECORD_SECS].as<uint32_t>();
 
-    // ── Parse per-button room mappings ────────────
-    if (doc.containsKey(KEY_BUTTONS)) {
-        JsonObject buttons = doc[KEY_BUTTONS].as<JsonObject>();
+    // ── Hardware pins ─────────────────────────────
+    if (doc.containsKey(KEY_PINS) && doc[KEY_PINS].is<JsonArray>()) {
+        JsonArray pins = doc[KEY_PINS].as<JsonArray>();
         cfg.button_count = 0;
-        for (JsonPair kv : buttons) {
+        for (JsonVariant v : pins) {
             if (cfg.button_count >= MAX_BUTTONS)
                 break;
-            cfg.button_pins[cfg.button_count] = atoi(kv.key().c_str());
-            cfg.button_rooms[cfg.button_count] = kv.value().as<String>();
-            cfg.button_count++;
+            cfg.button_pins[cfg.button_count++] = v.as<uint8_t>();
         }
     }
+    // Leftover "buttons" {gpio: room} is ignored; rooms come from GET /rooms.
 
-    Serial.printf("[%s] Loaded: server=%s://%s:%u wifi=%s buttons=%u\n", TAG, cfg.server_scheme.c_str(),
+    Serial.printf("[%s] Loaded: server=%s://%s:%u wifi=%s pins=%u\n", TAG, cfg.server_scheme.c_str(),
                   cfg.server_host.c_str(), cfg.server_port, cfg.wifi_ssid.c_str(), cfg.button_count);
     return true;
 }
@@ -125,15 +122,6 @@ uint32_t ConfigManager::sample_rate() {
 }
 uint32_t ConfigManager::max_record_secs() {
     return cfg.max_secs;
-}
-
-// ── Button defaults ────────────────────────────────
-
-void ConfigManager::load_button_defaults(RoomTargetStore& store) {
-    store.clear_defaults();
-    for (uint8_t i = 0; i < cfg.button_count; i++) {
-        store.set_default_room(cfg.button_pins[i], std::string(cfg.button_rooms[i].c_str()));
-    }
 }
 
 // ── Pin accessors ───────────────────────────────────

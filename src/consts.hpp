@@ -21,3 +21,15 @@ constexpr unsigned long HELLO_HEARTBEAT_MS = 10000;
 
 /// Transient heartbeat failure (timeout / 5xx): stay registered, retry sooner.
 constexpr unsigned long HELLO_HEARTBEAT_RETRY_MS = 30000;
+
+/// Revoked (403): drop registration and retry on this interval until allowed again.
+constexpr unsigned long HELLO_REVOKED_RETRY_MS = 30000;
+
+/// While hello is pending approval: retry this often for HELLO_PENDING_BURST_MS.
+constexpr unsigned long HELLO_PENDING_RETRY_MS = 200;
+
+/// How long to poll aggressively after the first pending (then HELLO_PENDING_SLOW_MS).
+constexpr unsigned long HELLO_PENDING_BURST_MS = 30000;
+
+/// After the burst, keep waiting without using the 60s error cap.
+constexpr unsigned long HELLO_PENDING_SLOW_MS = 5000;

@@ -6,7 +6,7 @@
 static const char* NVS_NS = "btn_cfg";
 
 // ── Hardcoded ultimate fallback ─────────────────────
-// These are used only when neither NVS nor config-file defaults match.
+// These are used only when NVS has no mapping for the pin.
 
 static const struct {
     uint8_t gpio;
@@ -28,7 +28,7 @@ std::string RoomTargetStore::_hardcoded_room(uint8_t gpio_pin) {
     return "study";
 }
 
-// ── Config-file defaults ────────────────────────────
+// ── In-memory defaults ──────────────────────────────
 
 void RoomTargetStore::set_default_room(uint8_t gpio, const std::string& room) {
     if (_defaults.size() >= MAX_BUTTONS)
@@ -72,7 +72,7 @@ std::string RoomTargetStore::get_room(uint8_t gpio_pin) const {
         }
     }
 
-    // Tier 2 — Config-file defaults
+    // Tier 2 — In-memory defaults
     for (const auto& d : _defaults) {
         if (d.gpio == gpio_pin)
             return d.room;

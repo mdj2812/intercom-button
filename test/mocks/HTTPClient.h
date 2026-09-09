@@ -23,6 +23,7 @@ struct HTTPMockState {
     std::string last_body;             // POST payload (JSON string posts)
     size_t last_body_size = 0;
     int post_call_count = 0;
+    int get_call_count = 0;
 };
 inline HTTPMockState _http_mock;
 
@@ -75,6 +76,16 @@ public:
         _http_mock.last_body = payload.c_str();
         _http_mock.last_body_size = payload.length();
         _http_mock.post_call_count++;
+
+        if (_http_mock.connect_error != 0)
+            return _http_mock.connect_error;
+        return _http_mock.response_code;
+    }
+
+    int GET() {
+        _http_mock.last_body.clear();
+        _http_mock.last_body_size = 0;
+        _http_mock.get_call_count++;
 
         if (_http_mock.connect_error != 0)
             return _http_mock.connect_error;
