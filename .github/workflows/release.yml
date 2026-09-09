@@ -36,12 +36,37 @@ jobs:
           mkdir -p release
           cp .pio/build/esp32-s3-devkitc-1/firmware.bin release/intercom-button-${{ github.ref_name }}.bin
           pio run -e esp32-s3-devkitc-1 -t size | tee release/size.txt
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 - "$VERSION" <<'PY'
+          import sys
+          from pathlib import Path
+          version = sys.argv[1]
+          heading = f"## [{version}]"
+          lines = Path("CHANGELOG.md").read_text().splitlines()
+          out = []
+          found = False
+          for line in lines:
+              if line.startswith("## [") and not line.startswith("## [Unreleased]"):
+                  if found:
+                      break
+                  if line.startswith(heading):
+                      found = True
+                      out.append(line)
+                      continue
+              elif found:
+                  out.append(line)
+          if not found:
+              raise SystemExit(f"CHANGELOG.md has no {heading} section")
+          while out and out[-1] == "":
+              out.pop()
+          Path("release/notes.md").write_text("\n".join(out) + "\n")
+          PY
 
       - name: Create release and upload assets
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
-          body_path: CHANGELOG.md
+          body_path: release/notes.md
           files: |
             release/intercom-button-${{ github.ref_name }}.bin
             release/size.txt
