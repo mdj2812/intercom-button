@@ -6,6 +6,7 @@
 #include "ota_manager.h"
 
 #include "config_manager.h"
+#include "consts.hpp"
 #include "device_id.h"
 #include "wifi_manager.h"
 
@@ -32,7 +33,7 @@ namespace OTAManager {
 // ── Internal state ───────────────────────────────────────
 
 static Progress s_progress;
-static char s_firmware_path[128] = "/esp32-intercom-button.bin";
+static const char* s_firmware_path = FIRMWARE_HTTP_PATH;
 static bool s_update_pending = false;
 
 // ── Public API ───────────────────────────────────────────

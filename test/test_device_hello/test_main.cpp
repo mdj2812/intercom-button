@@ -1,5 +1,6 @@
 /// Unit tests for DeviceHello through mocks.
 
+#include "consts.hpp"
 #include "device_hello.h"
 #include <Arduino.h>
 #include <HTTPClient.h>
@@ -34,6 +35,7 @@ void test_hello_success_parses_payload(void) {
     TEST_ASSERT_EQUAL_STRING("study", r.room);
     TEST_ASSERT_EQUAL(16000, r.sample_rate);
     TEST_ASSERT_EQUAL(60, r.max_record_secs);
+    TEST_ASSERT_FALSE(r.ota);
     TEST_ASSERT_EQUAL_STRING("http://ha.local:8123/api/home_intercom/devices/hello", _http_mock.last_url.c_str());
     TEST_ASSERT_EQUAL_STRING(DEVICE_MAC, _http_mock.last_device_id_header.c_str());
     TEST_ASSERT_EQUAL_STRING("application/json", _http_mock.last_content_type.c_str());
@@ -89,6 +91,26 @@ void test_hello_status_error_body(void) {
     TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Error), static_cast<int>(r.status));
 }
 
+void test_hello_ota_true(void) {
+    mock_http_set_response(200, R"({
+        "status": "ok",
+        "device_name": "Study Button",
+        "room": "study",
+        "sample_rate": 16000,
+        "max_record_secs": 60,
+        "ota": true
+    })");
+
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.0");
+
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Ok), static_cast<int>(r.status));
+    TEST_ASSERT_TRUE(r.ota);
+}
+
+void test_firmware_http_path(void) {
+    TEST_ASSERT_EQUAL_STRING("/api/home_intercom/firmware", FIRMWARE_HTTP_PATH);
+}
+
 void test_hello_https_scheme(void) {
     mock_http_set_response(200, R"({"status":"ok","device_name":"Btn","room":""})");
     DeviceHello::Result r = DeviceHello::send("https", "ha.example.com", 443, DEVICE_MAC, "0.1.0");
@@ -108,6 +130,8 @@ int main(void) {
     RUN_TEST(test_hello_connection_error);
     RUN_TEST(test_hello_invalid_json);
     RUN_TEST(test_hello_status_error_body);
+    RUN_TEST(test_hello_ota_true);
+    RUN_TEST(test_firmware_http_path);
     RUN_TEST(test_hello_https_scheme);
     return UNITY_END();
 }

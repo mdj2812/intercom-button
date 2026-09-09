@@ -62,6 +62,30 @@ jobs:
           Path("release/notes.md").write_text("\n".join(out) + "\n")
           PY
 
+      - name: Sign firmware
+        env:
+          OTA_PRIVATE_KEY: ${{ secrets.OTA_PRIVATE_KEY }}
+        run: |
+          if [ -z "$OTA_PRIVATE_KEY" ]; then
+            echo "::error::Repo secret OTA_PRIVATE_KEY is empty. Paste the PEM that matches src/ota_keys.h (scripts/ota_private.pem)."
+            exit 1
+          fi
+          umask 077
+          key=/tmp/ota_private.pem
+          printf '%s\n' "$OTA_PRIVATE_KEY" > "$key"
+          python3 scripts/sign_firmware.py \
+            "release/intercom-button-${GITHUB_REF_NAME}.bin" \
+            "$key" \
+            "release/intercom-button-${GITHUB_REF_NAME}.bin.sig"
+          rm -f "$key"
+          python3 -c "
+          import pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          n = len(p.read_bytes())
+          assert n == 64, f'{p} is {n} bytes, want 64'
+          print(f'{p.name}: 64-byte ECDSA signature')
+          " "release/intercom-button-${GITHUB_REF_NAME}.bin.sig"
+
       - name: Create release and upload assets
         uses: softprops/action-gh-release@v2
         with:
@@ -69,4 +93,5 @@ jobs:
           body_path: release/notes.md
           files: |
             release/intercom-button-${{ github.ref_name }}.bin
+            release/intercom-button-${{ github.ref_name }}.bin.sig
             release/size.txt

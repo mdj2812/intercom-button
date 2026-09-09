@@ -93,7 +93,7 @@ DeviceHello::Result DeviceHello::send(const char* server_scheme, const char* ser
         return result;
     }
 
-    StaticJsonDocument<384> doc;
+    StaticJsonDocument<512> doc;
     DeserializationError err = deserializeJson(doc, response.c_str());
     if (err) {
         result.error = "invalid json";
@@ -108,9 +108,10 @@ DeviceHello::Result DeviceHello::send(const char* server_scheme, const char* ser
         copy_field(result.room, sizeof(result.room), doc["room"] | "");
         result.sample_rate = doc["sample_rate"] | 0;
         result.max_record_secs = doc["max_record_secs"] | 0;
+        result.ota = doc["ota"] | false;
         // Hello `room` is the device's HA area (often empty) — not the button map.
-        Serial.printf("[%s] OK name=%s rate=%u max=%us\n", TAG, result.device_name, result.sample_rate,
-                      result.max_record_secs);
+        Serial.printf("[%s] OK name=%s rate=%u max=%us ota=%d\n", TAG, result.device_name, result.sample_rate,
+                      result.max_record_secs, result.ota ? 1 : 0);
         return result;
     }
 
