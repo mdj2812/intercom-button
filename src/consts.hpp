@@ -10,6 +10,9 @@ constexpr uint8_t MAX_BUTTONS = 8;
 // Maximum length of a room key string (e.g. "study", "living")
 constexpr uint8_t MAX_ROOM_KEY_LEN = 32;
 
+// Maximum length of a server-assigned device name from hello
+constexpr uint8_t MAX_DEVICE_NAME_LEN = 64;
+
 /// Reported to the server in POST /devices/hello.
 constexpr const char* FIRMWARE_VERSION = "0.1.0";
 

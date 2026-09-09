@@ -1,4 +1,5 @@
 #pragma once
+#include "consts.hpp"
 #include <cstdint>
 
 /// Trust-on-first-use registration: POST /api/home_intercom/devices/hello.
@@ -14,8 +15,8 @@ enum class Status {
 struct Result {
     Status status = Status::Error;
     const char* error = nullptr;
-    char device_name[64] = {};
-    char room[32] = {};
+    char device_name[MAX_DEVICE_NAME_LEN] = {};
+    char room[MAX_ROOM_KEY_LEN] = {};
     uint32_t sample_rate = 0;     // 0 = not provided
     uint32_t max_record_secs = 0; // 0 = not provided
 };
