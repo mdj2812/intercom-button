@@ -50,7 +50,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.platformio
-          key: pio-toolchains-${{ hashFiles('platformio.ini') }}
+          key: pio-toolchains-${{ hashFiles('platformio.ini', 'docker/Dockerfile') }}
 
       - name: Install PlatformIO & download toolchains
         run: |
@@ -59,6 +59,11 @@ jobs:
           pio platform install native
           # Trigger ESP32-S3 build to download compiler + framework (~1.5GB)
           pio run -e esp32-s3-devkitc-1
+          # upload / uploadfs tools — not pulled by a compile-only pio run
+          pio pkg install -g \
+            -t "platformio/tool-mkspiffs@~2.230.0" \
+            -t "platformio/tool-mklittlefs@~1.203.0" \
+            -t "platformio/tool-mkfatfs@~2.0.0"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6

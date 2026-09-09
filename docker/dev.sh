@@ -48,7 +48,7 @@ fi
 
 if $FORCE_BUILD; then
     echo "=== Building $IMAGE (~3GB) ==="
-    docker build \
+    DOCKER_BUILDKIT=1 docker build \
         --build-context "pio-cache=$HOME/.platformio" \
         --network host \
         -t "$IMAGE" \
