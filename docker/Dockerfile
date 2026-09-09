@@ -23,7 +23,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     rm -rf /var/lib/apt/lists/*
 
 # ── PlatformIO Core ─────────────────────────────────
-RUN pip3 install --no-cache-dir platformio
+# Pin Core so image rebuilds are reproducible. Bump this when upgrading.
+RUN pip3 install --no-cache-dir platformio==6.2.0
 
 # ── Pre-install ESP32 platform metadata ─────────────
 RUN pio platform install "espressif32"
