@@ -16,6 +16,12 @@ constexpr uint8_t MAX_DEVICE_NAME_LEN = 64;
 /// Reported to the server in POST /devices/hello.
 constexpr const char* FIRMWARE_VERSION = "0.2.0";
 
+/// LAN HTTP path for server-cached firmware (GitHub assets are HTTPS-only).
+constexpr const char* FIRMWARE_HTTP_PATH = "/api/home_intercom/firmware";
+
+/// After a failed flash, ignore hello `ota` until this elapses (or reboot).
+constexpr unsigned long OTA_RETRY_SKIP_MS = 5 * 60 * 1000UL;
+
 /// Re-hello while idle so HA last_seen stays inside the 5-minute online window.
 constexpr unsigned long HELLO_HEARTBEAT_MS = 10000;
 

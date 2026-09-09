@@ -48,6 +48,7 @@ static State state = State::IDLE;
 static unsigned long record_start_ms = 0;
 static const unsigned long MIN_RECORD_MS = 500;
 static unsigned long MAX_RECORD_MS = 60000; // updated from config
+static unsigned long ota_skip_until_ms = 0;
 
 static uint8_t active_button_index = 0; // which button triggered recording
 static unsigned long upload_start_ms = 0;
@@ -110,6 +111,16 @@ static void on_hello_ok(const DeviceHello::Result& hello, bool fetch_rooms) {
     }
     if (fetch_rooms)
         refresh_rooms_from_server();
+}
+
+static bool should_start_ota(const DeviceHello::Result& hello) {
+    if (!hello.ota)
+        return false;
+    if (OTAManager::is_pending_verify())
+        return false;
+    if ((long) (millis() - ota_skip_until_ms) < 0)
+        return false;
+    return true;
 }
 
 // ── LED color constants ────────────────────────────────
@@ -320,6 +331,11 @@ void loop() {
                 }
 
                 on_hello_ok(hello, true);
+                if (should_start_ota(hello)) {
+                    Serial.println("[main] OTA requested by server");
+                    state = State::OTA;
+                    break;
+                }
             }
 
             led_pairing_blink = false;
@@ -344,6 +360,11 @@ void loop() {
                 if (hello.status == DeviceHello::Status::Ok) {
                     on_hello_ok(hello, false);
                     Serial.println("[main] Hello heartbeat OK");
+                    if (should_start_ota(hello)) {
+                        Serial.println("[main] OTA requested by server");
+                        state = State::OTA;
+                        break;
+                    }
                 } else if (hello.status == DeviceHello::Status::Revoked) {
                     hello_ok = false;
                     hello_backoff_ms = HELLO_REVOKED_RETRY_MS;
@@ -476,9 +497,10 @@ void loop() {
                 delay(500);
                 ESP.restart();
             } else {
-                // Failure — blink red 3x, return to IDLE
+                // Failure — blink red 3x, skip hello-ota for a few minutes
                 Serial.printf("[main] OTA failed: %s\n", OTAManager::progress().error);
                 led_blink_n(C_RED, 3, 200);
+                ota_skip_until_ms = millis() + OTA_RETRY_SKIP_MS;
                 state = State::IDLE;
             }
             break;

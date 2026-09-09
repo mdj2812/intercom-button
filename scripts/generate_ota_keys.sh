@@ -57,4 +57,5 @@ PYEOF
 echo "---"
 echo "Copy the above into src/ota_keys.h"
 echo ""
-echo "Keep ota_private.pem SECRET — it's git-ignored. Use it in CI secrets."
+echo "Keep ota_private.pem SECRET — it's git-ignored."
+echo "Store the PEM as GitHub Actions secret OTA_PRIVATE_KEY so release.yml can attach .sig assets."

@@ -19,6 +19,7 @@ struct Result {
     char room[MAX_ROOM_KEY_LEN] = {};
     uint32_t sample_rate = 0;     // 0 = not provided
     uint32_t max_record_secs = 0; // 0 = not provided
+    bool ota = false;             // server wants this device to flash LAN firmware
 };
 
 /// One blocking POST. Caller owns retry/backoff.
