@@ -55,6 +55,23 @@ static unsigned long next_hello_ms = 0;
 static unsigned long hello_backoff_ms = 2000;
 static const unsigned long HELLO_BACKOFF_MAX_MS = 60000;
 
+static DeviceHello::Result send_hello() {
+    return DeviceHello::send(ConfigManager::server_scheme(), ConfigManager::server_host(), ConfigManager::server_port(),
+                             DeviceId::mac(), FIRMWARE_VERSION);
+}
+
+static void on_hello_ok(const DeviceHello::Result& hello) {
+    hello_ok = true;
+    hello_backoff_ms = 2000;
+    next_hello_ms = millis() + HELLO_HEARTBEAT_MS;
+    if (hello.max_record_secs > 0) {
+        MAX_RECORD_MS = hello.max_record_secs * 1000UL;
+    }
+    if (hello.room[0] != '\0') {
+        Serial.printf("[main] Server room=%s (button map still from config/NVS)\n", hello.room);
+    }
+}
+
 // ── LED color constants ────────────────────────────────
 
 struct LED {
@@ -217,9 +234,7 @@ void loop() {
                 if (millis() < next_hello_ms)
                     break;
 
-                DeviceHello::Result hello =
-                    DeviceHello::send(ConfigManager::server_scheme(), ConfigManager::server_host(),
-                                      ConfigManager::server_port(), DeviceId::mac(), FIRMWARE_VERSION);
+                DeviceHello::Result hello = send_hello();
 
                 if (hello.status != DeviceHello::Status::Ok) {
                     unsigned long backoff = hello_backoff_ms;
@@ -235,19 +250,12 @@ void loop() {
                     break;
                 }
 
-                hello_ok = true;
-                hello_backoff_ms = 2000;
-                if (hello.max_record_secs > 0) {
-                    MAX_RECORD_MS = hello.max_record_secs * 1000UL;
-                }
-                if (hello.room[0] != '\0') {
-                    Serial.printf("[main] Server room=%s (button map still from config/NVS)\n", hello.room);
-                }
+                on_hello_ok(hello);
             }
 
             led_set(C_GREEN);
 
-            // PTT triggers on PRESS (immediate) for responsive UX.
+            // PTT wins over a due heartbeat — do not delay talk with a hello POST.
             // Single-threaded loop(): no race on active_button_index —
             // ButtonManager::poll() runs synchronously, ISR only touches
             // volatile flags inside ButtonManager.
@@ -258,6 +266,26 @@ void loop() {
                 led_set(C_BLUE);
                 state = State::RECORDING;
                 Serial.printf("[main] Recording for GPIO%u...\n", active_pins[active_button_index]);
+                break;
+            }
+
+            if (millis() >= next_hello_ms) {
+                DeviceHello::Result hello = send_hello();
+                if (hello.status == DeviceHello::Status::Ok) {
+                    on_hello_ok(hello);
+                    Serial.println("[main] Hello heartbeat OK");
+                } else if (hello.status == DeviceHello::Status::Revoked ||
+                           hello.status == DeviceHello::Status::Pending) {
+                    hello_ok = false;
+                    hello_backoff_ms = HELLO_BACKOFF_MAX_MS;
+                    next_hello_ms = millis() + HELLO_BACKOFF_MAX_MS;
+                    Serial.printf("[main] Hello heartbeat: %s — will re-register\n",
+                                  hello.error ? hello.error : "blocked");
+                } else {
+                    next_hello_ms = millis() + HELLO_HEARTBEAT_RETRY_MS;
+                    Serial.printf("[main] Hello heartbeat failed (%s) — retry in %lu ms\n",
+                                  hello.error ? hello.error : "error", HELLO_HEARTBEAT_RETRY_MS);
+                }
             }
             break;
         }

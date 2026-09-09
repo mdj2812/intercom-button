@@ -62,7 +62,7 @@ The same firmware binary works for all rooms — just upload a different config 
 
 Copy `data/config.example.json` to `data/config.json` and fill in your settings. `data/config.json` is gitignored — WiFi credentials stay local.
 
-The device identifies itself with its Wi-Fi MAC (`X-Device-ID`). After WiFi connects it calls `POST /api/home_intercom/devices/hello` (trust-on-first-use) and then uploads to `/api/home_intercom/device/record`. No Home Assistant token is stored on the ESP32. Unknown or revoked MACs receive HTTP 403; revoke a lost device from the HA UI.
+The device identifies itself with its Wi-Fi MAC (`X-Device-ID`). After WiFi connects it calls `POST /api/home_intercom/devices/hello` (trust-on-first-use), then again every 2 minutes while idle so Home Assistant `last_seen` / Online stay current. Uploads go to `/api/home_intercom/device/record`. No Home Assistant token is stored on the ESP32. Unknown or revoked MACs receive HTTP 403; revoke a lost device from the HA UI. A heartbeat that sees revoked/pending drops back to the orange wait.
 
 **Multi-button setup**: flash firmware once, then for each device edit `data/config.json` (change `buttons` mapping) and run `pio run -e esp32-s3-devkitc-1 -t uploadfs`.
 
