@@ -62,7 +62,7 @@ The same firmware binary works for all rooms — just upload a different config 
 
 Copy `data/config.example.json` to `data/config.json` and fill in your settings. `data/config.json` is gitignored — WiFi credentials stay local.
 
-The device identifies itself with its Wi-Fi MAC (`X-Device-ID`) on `/api/home_intercom/device/record`. No Home Assistant token is stored on the ESP32. Unknown or revoked MACs receive HTTP 403; revoke a lost device from the HA UI.
+The device identifies itself with its Wi-Fi MAC (`X-Device-ID`). After WiFi connects it calls `POST /api/home_intercom/devices/hello` (trust-on-first-use) and then uploads to `/api/home_intercom/device/record`. No Home Assistant token is stored on the ESP32. Unknown or revoked MACs receive HTTP 403; revoke a lost device from the HA UI.
 
 **Multi-button setup**: flash firmware once, then for each device edit `data/config.json` (change `buttons` mapping) and run `pio run -e esp32-s3-devkitc-1 -t uploadfs`.
 
@@ -174,8 +174,9 @@ make docker-shell
 
 | Color | Meaning |
 |-------|---------|
-| 🟢 Green | Ready (WiFi connected, idle) |
+| 🟢 Green | Ready (WiFi connected, registered, idle) |
 | 🔴 Red blinking | WiFi disconnected |
+| 🟠 Orange blinking | Registering with the server (`/devices/hello`) |
 | 🔵 Blue | Recording |
 | ⚪ White blinking | Uploading |
 | 🟢 Flash ×4 | Upload success |
@@ -211,6 +212,7 @@ intercom-button/
 │   ├── test_config_manager/ # Config manager tests
 │   ├── test_http_uploader/  # HTTP upload tests
 │   ├── test_device_id/      # MAC identity tests
+│   ├── test_device_hello/   # /devices/hello registration tests
 │   ├── test_wifi_manager/   # WiFi manager tests
 │   ├── test_button_manager/ # Button manager tests
 │   └── test_room_target_store/ # Room store tests
@@ -223,6 +225,7 @@ intercom-button/
     ├── audio_recorder.h/cpp # 16kHz timer ISR → PSRAM → WAV
     ├── http_uploader.h/cpp  # POST /device/record?target=<room>
     ├── device_id.h/cpp      # STA MAC → X-Device-ID
+    ├── device_hello.h/cpp   # POST /devices/hello registration
     ├── button_manager.h/cpp # Multi-button GPIO matrix + debounce
     ├── room_target_store.h/cpp # NVS room target storage
     └── ota_manager.h/cpp    # OTA firmware update (optional)

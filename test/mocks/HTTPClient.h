@@ -20,6 +20,7 @@ struct HTTPMockState {
     std::string last_content_type;
     std::string last_auth_header;      // Authorization header value (if set)
     std::string last_device_id_header; // X-Device-ID header value (if set)
+    std::string last_body;             // POST payload (JSON string posts)
     size_t last_body_size = 0;
     int post_call_count = 0;
 };
@@ -61,7 +62,18 @@ public:
 
     int POST(uint8_t* data, size_t len) {
         (void) data;
+        _http_mock.last_body.clear();
         _http_mock.last_body_size = len;
+        _http_mock.post_call_count++;
+
+        if (_http_mock.connect_error != 0)
+            return _http_mock.connect_error;
+        return _http_mock.response_code;
+    }
+
+    int POST(String payload) {
+        _http_mock.last_body = payload.c_str();
+        _http_mock.last_body_size = payload.length();
         _http_mock.post_call_count++;
 
         if (_http_mock.connect_error != 0)

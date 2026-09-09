@@ -61,7 +61,7 @@ MAX9814 增益：将 GAIN 焊盘接地获得 50dB（桌面使用推荐）。
 
 复制 `data/config.example.json` 为 `data/config.json` 并填入你的设置。`data/config.json` 已加入 `.gitignore`——WiFi 凭证不会泄露。
 
-设备用 Wi-Fi MAC（`X-Device-ID`）在 `/api/home_intercom/device/record` 上表明身份，ESP32 上不再保存 Home Assistant 令牌。未知或已吊销的 MAC 会收到 HTTP 403；丢失的设备可在 HA 后台吊销。
+设备用 Wi-Fi MAC（`X-Device-ID`）表明身份。WiFi 连上后会 `POST /api/home_intercom/devices/hello`（首次信任注册），然后再向 `/api/home_intercom/device/record` 上传。ESP32 上不再保存 Home Assistant 令牌。未知或已吊销的 MAC 会收到 HTTP 403；丢失的设备可在 HA 后台吊销。
 
 **多按键部署**：烧录一次固件，然后每个设备修改 `data/config.json`（改 `buttons` 映射）后执行 `pio run -e esp32-s3-devkitc-1 -t uploadfs`。
 
@@ -173,8 +173,9 @@ make docker-shell
 
 | 颜色 | 含义 |
 |------|------|
-| 🟢 绿色 | 就绪（WiFi 已连接，空闲） |
+| 🟢 绿色 | 就绪（WiFi 已连接、已注册、空闲） |
 | 🔴 红色闪烁 | WiFi 断开 |
+| 🟠 橙色闪烁 | 正在向服务器注册（`/devices/hello`） |
 | 🔵 蓝色 | 录音中 |
 | ⚪ 白色闪烁 | 上传中 |
 | 🟢 闪 4 次 | 上传成功 |
@@ -209,6 +210,7 @@ intercom-button/
 │   ├── test_config_manager/ # 配置解析测试
 │   ├── test_http_uploader/  # HTTP 上传测试
 │   ├── test_device_id/      # MAC 身份测试
+│   ├── test_device_hello/   # /devices/hello 注册测试
 │   ├── test_wifi_manager/   # WiFi 管理测试
 │   ├── test_button_manager/ # 按键管理测试
 │   └── test_room_target_store/ # 房间存储测试
@@ -220,6 +222,7 @@ intercom-button/
     ├── audio_recorder.h/cpp # 16kHz 定时器 ISR → PSRAM → WAV
     ├── http_uploader.h/cpp  # POST /device/record?target=<room>
     ├── device_id.h/cpp      # STA MAC → X-Device-ID
+    ├── device_hello.h/cpp   # POST /devices/hello 注册
     ├── button_manager.h/cpp # 多按键 GPIO 矩阵 + 消抖
     ├── room_target_store.h/cpp # NVS 房间目标存储
     └── consts.hpp           # 共享常量
