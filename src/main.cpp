@@ -118,7 +118,7 @@ static bool should_start_ota(const DeviceHello::Result& hello) {
         return false;
     if (OTAManager::is_pending_verify())
         return false;
-    if ((long)(millis() - ota_skip_until_ms) < 0)
+    if ((long) (millis() - ota_skip_until_ms) < 0)
         return false;
     return true;
 }
