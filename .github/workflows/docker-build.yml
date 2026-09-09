@@ -54,7 +54,7 @@ jobs:
 
       - name: Install PlatformIO & download toolchains
         run: |
-          pip install platformio
+          pip install platformio==6.2.0
           pio platform install espressif32
           pio platform install native
           # Trigger ESP32-S3 build to download compiler + framework (~1.5GB)

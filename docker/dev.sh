@@ -74,6 +74,13 @@ DEVICE_FLAG=""
 [ -z "$USB_DEV" ] && echo "⚠️  No USB device found — upload won't work"
 
 # ── Run ─────────────────────────────────────────────
+# `pio device monitor` (miniterm) needs a TTY for termios. Pass -it when
+# the caller has one; skip it in CI / piped stdin so docker-flash still works.
+RUN_TTY=()
+if [ -t 0 ]; then
+    RUN_TTY=(-it)
+fi
+
 if [ $# -eq 0 ]; then
     exec docker run --rm -it \
         --network host \
@@ -82,7 +89,7 @@ if [ $# -eq 0 ]; then
         "$IMAGE" \
         /bin/bash
 else
-    exec docker run --rm \
+    exec docker run --rm "${RUN_TTY[@]}" \
         --network host \
         $DEVICE_FLAG \
         -v "$PROJECT_ROOT:/workspace" \
