@@ -41,6 +41,7 @@ MAX9814 增益：将 GAIN 焊盘接地获得 50dB（桌面使用推荐）。
     "server_port": 8123,
     "sample_rate": 16000,
     "max_record_secs": 60,
+    "pins": [4, 5, 12, 13],
     "buttons": {
         "4": "study",
         "5": "living",
@@ -55,15 +56,16 @@ MAX9814 增益：将 GAIN 焊盘接地获得 50dB（桌面使用推荐）。
 | `server_scheme` | 可信局域网使用 `http`，远端 HA 使用 `https`。HTTPS 流量已加密，但当前固件暂不验证服务器证书。 |
 | `server_host` | Home Assistant 的 IP（Docker 模式填 Docker 主机 IP） |
 | `server_port` | HA 集成用 `8123`，Docker 旧模式用 `8764` |
-| `buttons` | 每个 GPIO 引脚对应的默认房间。键为 GPIO 编号，值为 `rooms.json` 中的房间 ID（`study`、`living`、`cinema`、`bedroom`，或 `all` 向所有房间广播）。 |
+| `pins` | 要初始化的硬件 GPIO。顺序对应 `GET /api/home_intercom/rooms`（第 *i* 个按键 → 第 *i* 个房间键）。省略则使用 `buttons` 的 GPIO 键，再退回编译期 `{4,5,12,13}`。 |
+| `buttons` | 可选离线回退：GPIO → 房间 ID。成功从服务器拉取房间并写入 NVS 之前使用；服务器房间数少于按键时，多出的按键也用它。 |
 | `sample_rate` | 音频采样率，单位 Hz（默认 16000） |
 | `max_record_secs` | 最大录音时长，单位秒（默认 60） |
 
 复制 `data/config.example.json` 为 `data/config.json` 并填入你的设置。`data/config.json` 已加入 `.gitignore`——WiFi 凭证不会泄露。
 
-设备用 Wi-Fi MAC（`X-Device-ID`）表明身份。WiFi 连上后会 `POST /api/home_intercom/devices/hello`（首次信任注册），空闲时每 10 秒再 hello 一次以刷新 HA 的 `last_seen` / Online。然后再向 `/api/home_intercom/device/record` 上传。ESP32 上不再保存 Home Assistant 令牌。未知或已吊销的 MAC 会收到 HTTP 403；丢失的设备可在 HA 后台吊销。心跳若收到 revoked/pending，会回到橙色等待。
+设备用 Wi-Fi MAC（`X-Device-ID`）表明身份。WiFi 连上后会 `POST /api/home_intercom/devices/hello`（首次信任注册），再 `GET /api/home_intercom/rooms` 按列表顺序把按键映射到房间键。空闲时每 10 秒再 hello 一次以刷新 HA 的 `last_seen` / Online。然后再向 `/api/home_intercom/device/record` 上传。ESP32 上不再保存 Home Assistant 令牌。未知或已吊销的 MAC 会收到 HTTP 403；丢失的设备可在 HA 后台吊销。心跳若收到 revoked/pending，会回到橙色等待。
 
-**多按键部署**：烧录一次固件，然后每个设备修改 `data/config.json`（改 `buttons` 映射）后执行 `pio run -e esp32-s3-devkitc-1 -t uploadfs`。
+**多按键部署**：烧录一次固件。哪个 GPIO 是哪个按键写在 `pins`（或 `buttons` 的键）里。每个按键对应哪个房间由服务器房间列表顺序决定；`buttons` 仅作离线回退。改引脚后执行 `pio run -e esp32-s3-devkitc-1 -t uploadfs`。
 
 ## 快速开始
 
@@ -211,6 +213,7 @@ intercom-button/
 │   ├── test_http_uploader/  # HTTP 上传测试
 │   ├── test_device_id/      # MAC 身份测试
 │   ├── test_device_hello/   # /devices/hello 注册测试
+│   ├── test_room_fetcher/   # GET /rooms 房间目录测试
 │   ├── test_wifi_manager/   # WiFi 管理测试
 │   ├── test_button_manager/ # 按键管理测试
 │   └── test_room_target_store/ # 房间存储测试
@@ -223,6 +226,7 @@ intercom-button/
     ├── http_uploader.h/cpp  # POST /device/record?target=<room>
     ├── device_id.h/cpp      # STA MAC → X-Device-ID
     ├── device_hello.h/cpp   # POST /devices/hello 注册
+    ├── room_fetcher.h/cpp   # GET /rooms → 按键房间映射
     ├── button_manager.h/cpp # 多按键 GPIO 矩阵 + 消抖
     ├── room_target_store.h/cpp # NVS 房间目标存储
     └── consts.hpp           # 共享常量
@@ -282,7 +286,7 @@ make monitor
 
 ```text
 === ESP32-S3 Intercom Button ===
-[cfg] Loaded: server=https://ha.example.com:443 wifi=MyWiFi buttons=4
+[cfg] Loaded: server=https://ha.example.com:443 wifi=MyWiFi pins=4
 [wifi] Connecting to MyWiFi...
 [wifi] Connected
 [audio] Buffer: 960000 samples (60 sec), PSRAM free: 7654 KB
@@ -303,7 +307,7 @@ make monitor
 | 烧录失败 | USB 端口不对 | `pio device list`，然后 `make flash`（自动检测） |
 | 录音但不上传 | 服务器不可达 | 检查 `data/config.json` 中的 `server_host` |
 | 上传超时（ESP32 报失败但声音已播放） | HA 响应太慢 | 已知良性问题——音频已送达，重试逻辑会处理 |
-| 上传成功但没声音 | 房间键值不对 | 确认 `data/config.json` 中的 `room` 与 `rooms.json` 的键一致 |
+| 上传成功但没声音 | 房间键值不对 | 确认 `GET /api/home_intercom/rooms` 的键与扬声器一致；第 *i* 个按键用第 *i* 个键。离线回退是 `data/config.json` 里的 `buttons`。 |
 | 配置不加载 | LittleFS 未烧录 | 运行 `make flashfs` 上传文件系统 |
 | PSRAM 分配警告 | 板子变体不匹配 | 检查 `platformio.ini` 中 `board_build.psram_type = opi` |
 

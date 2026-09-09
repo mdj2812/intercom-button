@@ -61,7 +61,7 @@ DeviceHello::Result DeviceHello::send(const char* server_scheme, const char* ser
 
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-ID", device_id);
-    http.setTimeout(10000);
+    http.setTimeout(HELLO_HTTP_TIMEOUT_MS);
 
     Serial.printf("[%s] POST %s\n", TAG, url_str.c_str());
     int code = http.POST(body);
@@ -108,8 +108,9 @@ DeviceHello::Result DeviceHello::send(const char* server_scheme, const char* ser
         copy_field(result.room, sizeof(result.room), doc["room"] | "");
         result.sample_rate = doc["sample_rate"] | 0;
         result.max_record_secs = doc["max_record_secs"] | 0;
-        Serial.printf("[%s] OK name=%s room=%s rate=%u max=%us\n", TAG, result.device_name, result.room,
-                      result.sample_rate, result.max_record_secs);
+        // Hello `room` is the device's HA area (often empty) — not the button map.
+        Serial.printf("[%s] OK name=%s rate=%u max=%us\n", TAG, result.device_name, result.sample_rate,
+                      result.max_record_secs);
         return result;
     }
 

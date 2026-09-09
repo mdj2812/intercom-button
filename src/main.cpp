@@ -5,6 +5,7 @@
  * send WAV to Flask intercom server, which broadcasts to Home Assistant speakers.
  *
  * Each button is mapped to a target room via NVS (RoomTargetStore).
+ * After hello, GET /api/home_intercom/rooms fills that map (pin index → room key).
  * Configuration is loaded from LittleFS /config.json at boot.
  *
  * Hardware:
@@ -22,6 +23,7 @@
 #include "device_id.h"
 #include "http_uploader.h"
 #include "ota_manager.h"
+#include "room_fetcher.h"
 #include "room_target_store.h"
 #include "wifi_manager.h"
 
@@ -60,16 +62,38 @@ static DeviceHello::Result send_hello() {
                              DeviceId::mac(), FIRMWARE_VERSION);
 }
 
-static void on_hello_ok(const DeviceHello::Result& hello) {
+static void refresh_rooms_from_server() {
+    RoomFetcher::Result rooms =
+        RoomFetcher::fetch(ConfigManager::server_scheme(), ConfigManager::server_host(), ConfigManager::server_port());
+    if (!rooms.ok) {
+        Serial.printf("[main] Room fetch failed (%s) — keeping last NVS/config map\n",
+                      rooms.error ? rooms.error : "error");
+        return;
+    }
+    if (rooms.count == 0) {
+        Serial.println("[main] Server room catalog empty — keeping local map");
+        return;
+    }
+    uint8_t written = RoomFetcher::apply(room_store, active_pins, active_pin_count, rooms);
+    Serial.printf("[main] Room map from server (%u keys, %u written)\n", rooms.count, written);
+    for (uint8_t i = 0; i < active_pin_count; i++) {
+        if (i < rooms.count)
+            Serial.printf("[main] GPIO%u → %s\n", active_pins[i], rooms.keys[i]);
+        else
+            Serial.printf("[main] GPIO%u → %s (local, no server key)\n", active_pins[i],
+                          room_store.get_room(active_pins[i]).c_str());
+    }
+}
+
+static void on_hello_ok(const DeviceHello::Result& hello, bool fetch_rooms) {
     hello_ok = true;
     hello_backoff_ms = 2000;
     next_hello_ms = millis() + HELLO_HEARTBEAT_MS;
     if (hello.max_record_secs > 0) {
         MAX_RECORD_MS = hello.max_record_secs * 1000UL;
     }
-    if (hello.room[0] != '\0') {
-        Serial.printf("[main] Server room=%s (button map still from config/NVS)\n", hello.room);
-    }
+    if (fetch_rooms)
+        refresh_rooms_from_server();
 }
 
 // ── LED color constants ────────────────────────────────
@@ -124,7 +148,7 @@ void setup() {
                   ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(),
                   ConfigManager::max_record_secs());
 
-    // ── Per-button room mapping (NVS + config.json) ─
+    // ── Per-button rooms: NVS + optional config.json fallback ─
     if (!room_store.begin()) {
         Serial.println("[main] NVS init failed — using defaults");
     }
@@ -135,9 +159,10 @@ void setup() {
         active_pin_count = ConfigManager::active_pin_count();
     }
 
-    for (uint8_t i = 0; i < active_pin_count; i++) {
-        Serial.printf("[main] GPIO%u → %s\n", active_pins[i], room_store.get_room(active_pins[i]).c_str());
-    }
+    Serial.printf("[main] %u buttons:", active_pin_count);
+    for (uint8_t i = 0; i < active_pin_count; i++)
+        Serial.printf(" GPIO%u", active_pins[i]);
+    Serial.println(" (targets from GET /rooms after hello)");
 
     // ── Button manager ──────────────────────────────
     buttons.begin(active_pins, active_pin_count);
@@ -240,17 +265,21 @@ void loop() {
                     unsigned long backoff = hello_backoff_ms;
                     if (hello.status == DeviceHello::Status::Revoked)
                         backoff = HELLO_BACKOFF_MAX_MS;
+                    else if (hello.status == DeviceHello::Status::Pending)
+                        backoff = HELLO_PENDING_RETRY_MS;
                     next_hello_ms = millis() + backoff;
-                    if (hello_backoff_ms < HELLO_BACKOFF_MAX_MS)
-                        hello_backoff_ms = hello_backoff_ms * 2;
-                    if (hello_backoff_ms > HELLO_BACKOFF_MAX_MS)
-                        hello_backoff_ms = HELLO_BACKOFF_MAX_MS;
+                    if (hello.status != DeviceHello::Status::Pending) {
+                        if (hello_backoff_ms < HELLO_BACKOFF_MAX_MS)
+                            hello_backoff_ms = hello_backoff_ms * 2;
+                        if (hello_backoff_ms > HELLO_BACKOFF_MAX_MS)
+                            hello_backoff_ms = HELLO_BACKOFF_MAX_MS;
+                    }
                     Serial.printf("[main] Hello failed (%s) — retry in %lu ms\n", hello.error ? hello.error : "error",
                                   backoff);
                     break;
                 }
 
-                on_hello_ok(hello);
+                on_hello_ok(hello, true);
             }
 
             led_set(C_GREEN);
@@ -272,15 +301,18 @@ void loop() {
             if (millis() >= next_hello_ms) {
                 DeviceHello::Result hello = send_hello();
                 if (hello.status == DeviceHello::Status::Ok) {
-                    on_hello_ok(hello);
+                    on_hello_ok(hello, false);
                     Serial.println("[main] Hello heartbeat OK");
-                } else if (hello.status == DeviceHello::Status::Revoked ||
-                           hello.status == DeviceHello::Status::Pending) {
+                } else if (hello.status == DeviceHello::Status::Revoked) {
                     hello_ok = false;
                     hello_backoff_ms = HELLO_BACKOFF_MAX_MS;
                     next_hello_ms = millis() + HELLO_BACKOFF_MAX_MS;
                     Serial.printf("[main] Hello heartbeat: %s — will re-register\n",
                                   hello.error ? hello.error : "blocked");
+                } else if (hello.status == DeviceHello::Status::Pending) {
+                    hello_ok = false;
+                    next_hello_ms = millis() + HELLO_PENDING_RETRY_MS;
+                    Serial.printf("[main] Hello heartbeat: pending — retry in %lu ms\n", HELLO_PENDING_RETRY_MS);
                 } else {
                     next_hello_ms = millis() + HELLO_HEARTBEAT_RETRY_MS;
                     Serial.printf("[main] Hello heartbeat failed (%s) — retry in %lu ms\n",

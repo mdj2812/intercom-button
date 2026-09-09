@@ -42,6 +42,7 @@ The same firmware binary works for all rooms — just upload a different config 
     "server_port": 8123,
     "sample_rate": 16000,
     "max_record_secs": 60,
+    "pins": [4, 5, 12, 13],
     "buttons": {
         "4": "study",
         "5": "living",
@@ -56,15 +57,16 @@ The same firmware binary works for all rooms — just upload a different config 
 | `server_scheme` | `http` for a trusted LAN; `https` for remote HA. HTTPS traffic is encrypted, but this firmware currently does not verify the server certificate. |
 | `server_host` | Home Assistant IP (or Docker host for legacy mode) |
 | `server_port` | `8123` for HA integration, `8764` for legacy Docker |
-| `buttons` | Per-GPIO-pin room target defaults. Keys are GPIO numbers, values are room IDs from `rooms.json` (`study`, `living`, `cinema`, `bedroom`, or `all` for broadcast). |
+| `pins` | Hardware GPIOs to initialize. Order matches `GET /api/home_intercom/rooms` (pin *i* → room key *i*). Omit to use the GPIO keys of `buttons`, then compile-time `{4,5,12,13}`. |
+| `buttons` | Optional offline fallback: GPIO → room ID. Used until a successful room fetch writes NVS, and for extra pins when the server list is shorter. |
 | `sample_rate` | Audio sample rate in Hz (default: 16000) |
 | `max_record_secs` | Maximum recording duration in seconds (default: 60) |
 
 Copy `data/config.example.json` to `data/config.json` and fill in your settings. `data/config.json` is gitignored — WiFi credentials stay local.
 
-The device identifies itself with its Wi-Fi MAC (`X-Device-ID`). After WiFi connects it calls `POST /api/home_intercom/devices/hello` (trust-on-first-use), then again every 10 seconds while idle so Home Assistant `last_seen` / Online stay current. Uploads go to `/api/home_intercom/device/record`. No Home Assistant token is stored on the ESP32. Unknown or revoked MACs receive HTTP 403; revoke a lost device from the HA UI. A heartbeat that sees revoked/pending drops back to the orange wait.
+The device identifies itself with its Wi-Fi MAC (`X-Device-ID`). After WiFi connects it calls `POST /api/home_intercom/devices/hello` (trust-on-first-use), then `GET /api/home_intercom/rooms` to map buttons to room keys in list order. Hello repeats every 10 seconds while idle so Home Assistant `last_seen` / Online stay current. Uploads go to `/api/home_intercom/device/record`. No Home Assistant token is stored on the ESP32. Unknown or revoked MACs receive HTTP 403; revoke a lost device from the HA UI. A heartbeat that sees revoked/pending drops back to the orange wait.
 
-**Multi-button setup**: flash firmware once, then for each device edit `data/config.json` (change `buttons` mapping) and run `pio run -e esp32-s3-devkitc-1 -t uploadfs`.
+**Multi-button setup**: flash firmware once. Which GPIO is which button stays in `pins` (or `buttons` keys). Which room each button targets comes from the server room list order; keep `buttons` only as an offline fallback. Re-upload LittleFS with `pio run -e esp32-s3-devkitc-1 -t uploadfs` after changing pins.
 
 ## Quick Start
 
@@ -213,6 +215,7 @@ intercom-button/
 │   ├── test_http_uploader/  # HTTP upload tests
 │   ├── test_device_id/      # MAC identity tests
 │   ├── test_device_hello/   # /devices/hello registration tests
+│   ├── test_room_fetcher/   # GET /rooms catalog tests
 │   ├── test_wifi_manager/   # WiFi manager tests
 │   ├── test_button_manager/ # Button manager tests
 │   └── test_room_target_store/ # Room store tests
@@ -226,6 +229,7 @@ intercom-button/
     ├── http_uploader.h/cpp  # POST /device/record?target=<room>
     ├── device_id.h/cpp      # STA MAC → X-Device-ID
     ├── device_hello.h/cpp   # POST /devices/hello registration
+    ├── room_fetcher.h/cpp   # GET /rooms → pin[i] room map
     ├── button_manager.h/cpp # Multi-button GPIO matrix + debounce
     ├── room_target_store.h/cpp # NVS room target storage
     └── ota_manager.h/cpp    # OTA firmware update (optional)
@@ -285,7 +289,7 @@ The firmware logs every state transition:
 
 ```
 === ESP32-S3 Intercom Button ===
-[cfg] Loaded: server=https://ha.example.com:443 wifi=MyWiFi buttons=4
+[cfg] Loaded: server=https://ha.example.com:443 wifi=MyWiFi pins=4
 [wifi] Connecting to MyWiFi...
 [wifi] Connected
 [audio] Buffer: 960000 samples (60 sec), PSRAM free: 7654 KB
@@ -306,7 +310,7 @@ The firmware logs every state transition:
 | Upload fails | Wrong USB port | `pio device list`, then `make flash` (auto-detects) |
 | Recording but no upload | Server unreachable | Check `server_host` in `data/config.json` |
 | Upload timeout (ESP32 says failed but audio played) | HA response too slow | Known benign issue — audio was delivered, retry logic handles it |
-| Upload OK but no sound | Wrong room key | Verify `room` in `data/config.json` matches a key in `rooms.json` (`study`/`living`/`cinema`/`bedroom`) |
+| Upload OK but no sound | Wrong room key | Confirm `GET /api/home_intercom/rooms` keys match speakers; button *i* uses key *i*. Offline fallback is `buttons` in `data/config.json`. |
 | Config not loading | LittleFS not flashed | Run `make flashfs` to upload the file system |
 | PSRAM allocation warning | Board variant mismatch | Verify `board_build.psram_type = opi` in `platformio.ini` |
 

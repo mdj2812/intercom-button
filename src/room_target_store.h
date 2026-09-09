@@ -8,7 +8,7 @@
 ///
 /// Priority chain (first match wins):
 ///   1. NVS (`btn_cfg` namespace, `btn_<gpio>` key) — runtime reconfigurable
-///   2. Config-file defaults (set via `set_default_room()`, typically from config.json)
+///   2. Config-file defaults (set via `set_default_room()`, typically from config.json "buttons")
 ///   3. Compiled-in hardcoded defaults
 ///
 /// Key format: `btn_<gpio>` → room key string (e.g. "study", "living").

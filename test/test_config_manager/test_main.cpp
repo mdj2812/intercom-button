@@ -5,8 +5,10 @@
 /// This tests the ACTUAL behavior, not an idealized version.
 
 #include "config_manager.h"
+#include "room_target_store.h"
 #include <Arduino.h>
 #include <LittleFS.h>
+#include <Preferences.h>
 #include <unity.h>
 
 void setUp() {}
@@ -98,6 +100,43 @@ void test_legacy_ha_token_is_ignored() {
     TEST_ASSERT_EQUAL_STRING("TokenWiFi", ConfigManager::wifi_ssid());
 }
 
+void test_pins_array_selects_gpios() {
+    inject_and_load(R"({
+        "wifi_ssid": "PinWiFi",
+        "pins": [4, 5, 12]
+    })");
+
+    TEST_ASSERT_EQUAL(3, ConfigManager::active_pin_count());
+    TEST_ASSERT_EQUAL(4, ConfigManager::active_pins()[0]);
+    TEST_ASSERT_EQUAL(5, ConfigManager::active_pins()[1]);
+    TEST_ASSERT_EQUAL(12, ConfigManager::active_pins()[2]);
+}
+
+void test_buttons_keys_used_when_pins_omitted() {
+    inject_and_load(R"({
+        "wifi_ssid": "BtnWiFi",
+        "buttons": {"4": "study", "5": "living"}
+    })");
+
+    TEST_ASSERT_EQUAL(2, ConfigManager::active_pin_count());
+    TEST_ASSERT_EQUAL(4, ConfigManager::active_pins()[0]);
+    TEST_ASSERT_EQUAL(5, ConfigManager::active_pins()[1]);
+}
+
+void test_load_button_defaults_from_buttons_object() {
+    inject_and_load(R"({
+        "pins": [4, 5],
+        "buttons": {"4": "garage", "5": "office"}
+    })");
+
+    RoomTargetStore store;
+    Preferences::reset_all();
+    store.begin();
+    ConfigManager::load_button_defaults(store);
+    TEST_ASSERT_EQUAL_STRING("garage", store.get_room(4).c_str());
+    TEST_ASSERT_EQUAL_STRING("office", store.get_room(5).c_str());
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_full_config);
@@ -106,5 +145,8 @@ int main() {
     RUN_TEST(test_invalid_json_keeps_previous_values);
     RUN_TEST(test_missing_file_keeps_prior_state);
     RUN_TEST(test_legacy_ha_token_is_ignored);
+    RUN_TEST(test_pins_array_selects_gpios);
+    RUN_TEST(test_buttons_keys_used_when_pins_omitted);
+    RUN_TEST(test_load_button_defaults_from_buttons_object);
     return UNITY_END();
 }

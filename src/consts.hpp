@@ -21,3 +21,11 @@ constexpr unsigned long HELLO_HEARTBEAT_MS = 10000;
 
 /// Transient heartbeat failure (timeout / 5xx): stay registered, retry sooner.
 constexpr unsigned long HELLO_HEARTBEAT_RETRY_MS = 30000;
+
+/// HTTP timeout for POST /devices/hello. Must exceed the server pending-hello
+/// hold (HOME_INTERCOM_PENDING_HELLO_WAIT, default 8s) so approve can return ok.
+constexpr uint32_t HELLO_HTTP_TIMEOUT_MS = 30000;
+
+/// After status=pending, retry immediately so a hello is usually in-flight
+/// when the admin approves (home-intercom #51 / issue #36).
+constexpr unsigned long HELLO_PENDING_RETRY_MS = 200;

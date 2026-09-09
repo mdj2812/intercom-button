@@ -23,12 +23,12 @@ uint32_t sample_rate();
 uint32_t max_record_secs();
 
 /// Populate RoomTargetStore config-file defaults from config.json "buttons" field.
-/// Call after begin() and room_store.begin().
+/// Offline fallback when GET /rooms has not yet written NVS. Call after begin()
+/// and room_store.begin().
 void load_button_defaults(RoomTargetStore& store);
 
-/// Active GPIO pins from config.json "pins" array (decides which GPIOs to initialize).
-/// Distinct from the "buttons" mapping — pins = which GPIOs, buttons = what room per GPIO.
-/// Falls back to compiled-in defaults if not configured.
+/// Active GPIO pins from config.json "pins" array, else GPIO keys of "buttons".
+/// Room targets come from the server; these pins are hardware-only.
 const uint8_t* active_pins();
 uint8_t active_pin_count();
 
