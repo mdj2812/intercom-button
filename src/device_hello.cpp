@@ -61,7 +61,7 @@ DeviceHello::Result DeviceHello::send(const char* server_scheme, const char* ser
 
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-ID", device_id);
-    http.setTimeout(HELLO_HTTP_TIMEOUT_MS);
+    http.setTimeout(10000);
 
     Serial.printf("[%s] POST %s\n", TAG, url_str.c_str());
     int code = http.POST(body);

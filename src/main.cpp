@@ -265,15 +265,11 @@ void loop() {
                     unsigned long backoff = hello_backoff_ms;
                     if (hello.status == DeviceHello::Status::Revoked)
                         backoff = HELLO_BACKOFF_MAX_MS;
-                    else if (hello.status == DeviceHello::Status::Pending)
-                        backoff = HELLO_PENDING_RETRY_MS;
                     next_hello_ms = millis() + backoff;
-                    if (hello.status != DeviceHello::Status::Pending) {
-                        if (hello_backoff_ms < HELLO_BACKOFF_MAX_MS)
-                            hello_backoff_ms = hello_backoff_ms * 2;
-                        if (hello_backoff_ms > HELLO_BACKOFF_MAX_MS)
-                            hello_backoff_ms = HELLO_BACKOFF_MAX_MS;
-                    }
+                    if (hello_backoff_ms < HELLO_BACKOFF_MAX_MS)
+                        hello_backoff_ms = hello_backoff_ms * 2;
+                    if (hello_backoff_ms > HELLO_BACKOFF_MAX_MS)
+                        hello_backoff_ms = HELLO_BACKOFF_MAX_MS;
                     Serial.printf("[main] Hello failed (%s) — retry in %lu ms\n", hello.error ? hello.error : "error",
                                   backoff);
                     break;
@@ -303,16 +299,13 @@ void loop() {
                 if (hello.status == DeviceHello::Status::Ok) {
                     on_hello_ok(hello, false);
                     Serial.println("[main] Hello heartbeat OK");
-                } else if (hello.status == DeviceHello::Status::Revoked) {
+                } else if (hello.status == DeviceHello::Status::Revoked ||
+                           hello.status == DeviceHello::Status::Pending) {
                     hello_ok = false;
                     hello_backoff_ms = HELLO_BACKOFF_MAX_MS;
                     next_hello_ms = millis() + HELLO_BACKOFF_MAX_MS;
                     Serial.printf("[main] Hello heartbeat: %s — will re-register\n",
                                   hello.error ? hello.error : "blocked");
-                } else if (hello.status == DeviceHello::Status::Pending) {
-                    hello_ok = false;
-                    next_hello_ms = millis() + HELLO_PENDING_RETRY_MS;
-                    Serial.printf("[main] Hello heartbeat: pending — retry in %lu ms\n", HELLO_PENDING_RETRY_MS);
                 } else {
                     next_hello_ms = millis() + HELLO_HEARTBEAT_RETRY_MS;
                     Serial.printf("[main] Hello heartbeat failed (%s) — retry in %lu ms\n",
