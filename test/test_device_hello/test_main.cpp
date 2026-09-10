@@ -119,6 +119,50 @@ void test_hello_https_scheme(void) {
     TEST_ASSERT_TRUE(_secure_client_insecure);
 }
 
+void test_parsed_hello_confirms_ota_boot(void) {
+    TEST_ASSERT_TRUE(DeviceHello::confirms_ota_boot(DeviceHello::Status::Ok));
+    TEST_ASSERT_TRUE(DeviceHello::confirms_ota_boot(DeviceHello::Status::Pending));
+    TEST_ASSERT_TRUE(DeviceHello::confirms_ota_boot(DeviceHello::Status::Revoked));
+    TEST_ASSERT_FALSE(DeviceHello::confirms_ota_boot(DeviceHello::Status::Error));
+}
+
+void test_hello_ok_pending_revoked_confirm_ota_boot(void) {
+    mock_http_set_response(200, R"({"status":"ok","device_name":"Btn","room":""})");
+    DeviceHello::Result ok = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.1");
+    TEST_ASSERT_TRUE(DeviceHello::confirms_ota_boot(ok.status));
+
+    mock_http_reset();
+    mock_http_set_response(200, R"({"status":"pending"})");
+    DeviceHello::Result pending = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.1");
+    TEST_ASSERT_TRUE(DeviceHello::confirms_ota_boot(pending.status));
+
+    mock_http_reset();
+    mock_http_set_response(HTTP_CODE_FORBIDDEN, R"({"status":"error","error":"device revoked"})");
+    DeviceHello::Result revoked = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.1");
+    TEST_ASSERT_TRUE(DeviceHello::confirms_ota_boot(revoked.status));
+}
+
+void test_hello_transport_errors_do_not_confirm_ota_boot(void) {
+    mock_http_set_error(-11);
+    DeviceHello::Result timeout = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.1");
+    TEST_ASSERT_FALSE(DeviceHello::confirms_ota_boot(timeout.status));
+
+    mock_http_reset();
+    mock_http_set_response(500, "Internal Server Error");
+    DeviceHello::Result http_err = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.1");
+    TEST_ASSERT_FALSE(DeviceHello::confirms_ota_boot(http_err.status));
+
+    mock_http_reset();
+    mock_http_set_response(200, "{broken");
+    DeviceHello::Result bad_json = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.1");
+    TEST_ASSERT_FALSE(DeviceHello::confirms_ota_boot(bad_json.status));
+
+    mock_http_reset();
+    mock_http_set_response(200, R"({"status":"error","error":"device registry unavailable"})");
+    DeviceHello::Result rejected = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.1");
+    TEST_ASSERT_FALSE(DeviceHello::confirms_ota_boot(rejected.status));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_hello_success_parses_payload);
@@ -133,5 +177,8 @@ int main(void) {
     RUN_TEST(test_hello_ota_true);
     RUN_TEST(test_firmware_http_path);
     RUN_TEST(test_hello_https_scheme);
+    RUN_TEST(test_parsed_hello_confirms_ota_boot);
+    RUN_TEST(test_hello_ok_pending_revoked_confirm_ota_boot);
+    RUN_TEST(test_hello_transport_errors_do_not_confirm_ota_boot);
     return UNITY_END();
 }

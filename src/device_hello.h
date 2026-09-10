@@ -22,6 +22,12 @@ struct Result {
     bool ota = false;             // server wants this device to flash LAN firmware
 };
 
+/// Parsed hello (ok / pending / revoked) proves the new image can talk to Home Intercom.
+/// Transport, HTTP, and JSON failures do not — keep the OTA confirm deadline.
+inline bool confirms_ota_boot(Status status) {
+    return status == Status::Ok || status == Status::Pending || status == Status::Revoked;
+}
+
 /// One blocking POST. Caller owns retry/backoff.
 Result send(const char* server_scheme, const char* server_host, uint16_t server_port, const char* device_id,
             const char* firmware_version);

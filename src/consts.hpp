@@ -22,6 +22,9 @@ constexpr const char* FIRMWARE_HTTP_PATH = "/api/home_intercom/firmware";
 /// After a failed flash, ignore hello `ota` until this elapses (or reboot).
 constexpr unsigned long OTA_RETRY_SKIP_MS = 5 * 60 * 1000UL;
 
+/// While pending OTA verify, retry hello this often until confirm or timeout.
+constexpr unsigned long HELLO_OTA_CONFIRM_RETRY_MS = 2000;
+
 /// Re-hello while idle so HA last_seen stays inside the 5-minute online window.
 constexpr unsigned long HELLO_HEARTBEAT_MS = 10000;
 
