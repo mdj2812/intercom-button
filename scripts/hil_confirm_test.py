@@ -297,6 +297,14 @@ def main():
         os.close(fd)
         sys.exit(0 if hit is not None else 2)
 
+    print("--- wait GET /config (#29) ---", flush=True)
+    hit_cfg, _ = wait_for(fd, ("[cfghttp] OK",), 25, buf)
+    print(f"\n[hil] config hit={hit_cfg!r}", flush=True)
+    if hit_cfg is None:
+        print("TIMEOUT waiting for GET /config", flush=True)
+        os.close(fd)
+        sys.exit(9)
+
     run_dry_run(fd, buf, args.skip_nohello)
     os.close(fd)
     sys.exit(0)

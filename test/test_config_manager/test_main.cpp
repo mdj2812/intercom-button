@@ -35,8 +35,6 @@ void test_full_config() {
     TEST_ASSERT_EQUAL_STRING("https", ConfigManager::server_scheme());
     TEST_ASSERT_EQUAL_STRING("10.0.0.1", ConfigManager::server_host());
     TEST_ASSERT_EQUAL(9999, ConfigManager::server_port());
-    TEST_ASSERT_EQUAL(8000, ConfigManager::sample_rate());
-    TEST_ASSERT_EQUAL(30, ConfigManager::max_record_secs());
 }
 
 // ── Test 2: Scheme is normalized and invalid values are ignored ──
@@ -53,19 +51,19 @@ void test_partial_config_only_overwrites_present_keys() {
     inject_and_load(R"({
         "wifi_ssid": "FullWiFi",
         "server_host": "192.168.1.1",
-        "sample_rate": 8000
+        "server_port": 8000
     })");
 
-    inject_and_load(R"({"sample_rate": 22050})");
+    inject_and_load(R"({"server_port": 22050})");
 
-    TEST_ASSERT_EQUAL(22050, ConfigManager::sample_rate());
+    TEST_ASSERT_EQUAL(22050, ConfigManager::server_port());
     TEST_ASSERT_EQUAL_STRING("FullWiFi", ConfigManager::wifi_ssid());
     TEST_ASSERT_EQUAL_STRING("192.168.1.1", ConfigManager::server_host());
 }
 
 // ── Test 4: Invalid JSON — previous values keep ─────
 void test_invalid_json_keeps_previous_values() {
-    inject_and_load(R"({"wifi_ssid": "StableWiFi", "sample_rate": 8000})");
+    inject_and_load(R"({"wifi_ssid": "StableWiFi", "server_port": 8000})");
 
     LittleFS.reset();
     LittleFS.begin(true);
@@ -73,19 +71,19 @@ void test_invalid_json_keeps_previous_values() {
     ConfigManager::begin();
 
     TEST_ASSERT_EQUAL_STRING("StableWiFi", ConfigManager::wifi_ssid());
-    TEST_ASSERT_EQUAL(8000, ConfigManager::sample_rate());
+    TEST_ASSERT_EQUAL(8000, ConfigManager::server_port());
 }
 
 // ── Test 5: Missing file — keeps previous values ─────
 void test_missing_file_keeps_prior_state() {
-    inject_and_load(R"({"wifi_ssid": "GarageWiFi", "sample_rate": 22050})");
+    inject_and_load(R"({"wifi_ssid": "GarageWiFi", "server_port": 22050})");
 
     LittleFS.reset();
     LittleFS.begin(true);
     ConfigManager::begin(); // file not found
 
     TEST_ASSERT_EQUAL_STRING("GarageWiFi", ConfigManager::wifi_ssid());
-    TEST_ASSERT_EQUAL(22050, ConfigManager::sample_rate());
+    TEST_ASSERT_EQUAL(22050, ConfigManager::server_port());
 }
 
 // ── Test 6: Leftover ha_token in JSON is ignored ──
@@ -124,6 +122,16 @@ void test_legacy_buttons_object_is_ignored() {
     TEST_ASSERT_EQUAL(12, ConfigManager::active_pins()[2]);
 }
 
+void test_leftover_audio_keys_are_ignored() {
+    inject_and_load(R"({
+        "wifi_ssid": "AudioWiFi",
+        "sample_rate": 8000,
+        "max_record_secs": 30
+    })");
+
+    TEST_ASSERT_EQUAL_STRING("AudioWiFi", ConfigManager::wifi_ssid());
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_full_config);
@@ -134,5 +142,6 @@ int main() {
     RUN_TEST(test_legacy_ha_token_is_ignored);
     RUN_TEST(test_pins_array_selects_gpios);
     RUN_TEST(test_legacy_buttons_object_is_ignored);
+    RUN_TEST(test_leftover_audio_keys_are_ignored);
     return UNITY_END();
 }

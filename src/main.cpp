@@ -8,6 +8,7 @@
  * After hello (boot and idle heartbeat), a non-empty ``buttons`` map is applied
  * (home-intercom#78 / #39). Empty ``{}`` or a missing field keeps last NVS.
  * Pins omitted from a non-empty map are unassigned (home-intercom#74).
+ * GET /config supplies sample_rate and max_record_secs (#29); hello repeats them.
  * GET /media_players is the PWA speaker catalog, not a room map.
  * Configuration is loaded from LittleFS /config.json at boot.
  *
@@ -36,6 +37,7 @@
 #include "http_uploader.h"
 #include "ota_manager.h"
 #include "room_target_store.h"
+#include "server_config.h"
 #include "wifi_manager.h"
 
 // ── Globals ─────────────────────────────────────────
@@ -51,7 +53,9 @@ enum class State { IDLE, RECORDING, UPLOADING, CONFIRMING, OTA };
 static State state = State::IDLE;
 static unsigned long record_start_ms = 0;
 static const unsigned long MIN_RECORD_MS = 500;
-static unsigned long MAX_RECORD_MS = 60000; // updated from config
+static uint32_t audio_sample_rate = AUDIO_SAMPLE_RATE_DEFAULT;
+static uint32_t audio_max_secs = AUDIO_MAX_RECORD_SECS_DEFAULT;
+static unsigned long MAX_RECORD_MS = AUDIO_MAX_RECORD_SECS_DEFAULT * 1000UL;
 static unsigned long ota_skip_until_ms = 0;
 
 static uint8_t active_button_index = 0; // which button triggered recording
@@ -67,6 +71,8 @@ static const unsigned long HELLO_BACKOFF_MAX_MS = 60000;
 static bool confirm_dry_run = false;
 static bool confirm_skip_hello = false;
 static char last_room_fp[192] = {};
+static bool server_audio_ok = false;
+static unsigned long next_config_ms = 0;
 
 static unsigned long pending_retry_delay() {
     if (pending_since_ms == 0)
@@ -163,14 +169,48 @@ static void begin_confirm_dry_run(bool skip_hello) {
                   OTAManager::CONFIRM_DRY_RUN_SEC, skip_hello ? "hello skipped" : "hello");
 }
 
+static bool apply_server_audio(uint32_t rate, uint32_t secs) {
+    ServerConfig::AudioSettings next = ServerConfig::merge_audio({audio_sample_rate, audio_max_secs}, rate, secs);
+    MAX_RECORD_MS = next.max_record_secs * 1000UL;
+    if (next.sample_rate == audio_sample_rate && next.max_record_secs == audio_max_secs)
+        return true;
+    if (!recorder.configure(next.sample_rate, next.max_record_secs)) {
+        MAX_RECORD_MS = audio_max_secs * 1000UL;
+        Serial.printf("[main] Audio reconfigure failed — keeping %u Hz / %us\n", audio_sample_rate, audio_max_secs);
+        return false;
+    }
+    audio_sample_rate = next.sample_rate;
+    audio_max_secs = next.max_record_secs;
+    Serial.printf("[main] Audio from server: %u Hz, max %us\n", audio_sample_rate, audio_max_secs);
+    return true;
+}
+
+static void fetch_server_audio_if_due() {
+    if (server_audio_ok || millis() < next_config_ms)
+        return;
+    ServerConfig::Result cfg =
+        ServerConfig::fetch(ConfigManager::server_scheme(), ConfigManager::server_host(), ConfigManager::server_port());
+    if (!cfg.ok) {
+        next_config_ms = millis() + AUDIO_CONFIG_RETRY_MS;
+        Serial.printf("[main] GET /config failed (%s) — retry in %lu ms\n", cfg.error ? cfg.error : "error",
+                      AUDIO_CONFIG_RETRY_MS);
+        return;
+    }
+    if (!apply_server_audio(cfg.sample_rate, cfg.max_record_secs)) {
+        next_config_ms = millis() + AUDIO_CONFIG_RETRY_MS;
+        Serial.printf("[main] Audio apply failed — retry GET /config in %lu ms\n", AUDIO_CONFIG_RETRY_MS);
+        return;
+    }
+    server_audio_ok = true;
+}
+
 static void on_hello_ok(const DeviceHello::Result& hello) {
     hello_ok = true;
     hello_backoff_ms = 2000;
     clear_pending_wait();
     next_hello_ms = millis() + HELLO_HEARTBEAT_MS;
-    if (hello.max_record_secs > 0) {
-        MAX_RECORD_MS = hello.max_record_secs * 1000UL;
-    }
+    if (hello.sample_rate > 0 || hello.max_record_secs > 0)
+        apply_server_audio(hello.sample_rate, hello.max_record_secs);
     if (hello.has_buttons)
         apply_hello_buttons(hello);
 }
@@ -249,11 +289,11 @@ void setup() {
 
     // ── Load runtime config from LittleFS ───────────
     ConfigManager::begin();
-    MAX_RECORD_MS = ConfigManager::max_record_secs() * 1000UL;
+    MAX_RECORD_MS = audio_max_secs * 1000UL;
 
-    Serial.printf("Server: %s://%s:%u | Device: %s | Max: %us\n", ConfigManager::server_scheme(),
-                  ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(),
-                  ConfigManager::max_record_secs());
+    Serial.printf("Server: %s://%s:%u | Device: %s | Audio default: %u Hz / %us\n", ConfigManager::server_scheme(),
+                  ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(), audio_sample_rate,
+                  audio_max_secs);
 
     // ── Per-button rooms: NVS, filled from hello buttons ─
     if (!room_store.begin()) {
@@ -277,7 +317,7 @@ void setup() {
     WiFiManager::begin(ConfigManager::wifi_ssid(), ConfigManager::wifi_password());
 
     // ── Audio recorder ──────────────────────────────
-    if (!recorder.begin(ConfigManager::sample_rate(), ConfigManager::max_record_secs())) {
+    if (!recorder.begin(audio_sample_rate, audio_max_secs)) {
         Serial.println("FATAL: AudioRecorder init failed");
         while (1) {
             led_blink(C_RED, 200);
@@ -366,6 +406,8 @@ void loop() {
             if (wifi_ok && !was_wifi_ok) {
                 next_hello_ms = 0;
                 hello_backoff_ms = 2000;
+                next_config_ms = 0;
+                server_audio_ok = false;
             }
             if (!wifi_ok) {
                 hello_ok = false;
@@ -378,6 +420,8 @@ void loop() {
                 led_blink(C_RED, 500);
                 break;
             }
+
+            fetch_server_audio_if_due();
 
             if (!hello_ok) {
                 led_pairing_blink = true;

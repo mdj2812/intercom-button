@@ -12,12 +12,10 @@ static constexpr const char* KEY_WIFI_PASSWORD = "wifi_password";
 static constexpr const char* KEY_SERVER_SCHEME = "server_scheme";
 static constexpr const char* KEY_SERVER_HOST = "server_host";
 static constexpr const char* KEY_SERVER_PORT = "server_port";
-static constexpr const char* KEY_SAMPLE_RATE = "sample_rate";
-static constexpr const char* KEY_MAX_RECORD_SECS = "max_record_secs";
 static constexpr const char* KEY_PINS = "pins";
 
 // JSON document size: base fields + pin array + slack for unknown keys
-static constexpr size_t JSON_BASE = 256;   // wifi, server, audio fields
+static constexpr size_t JSON_BASE = 256;   // wifi, server fields
 static constexpr size_t JSON_PER_PIN = 50; // pin entry + leftover-key slack
 static constexpr size_t JSON_DOC_SIZE = JSON_BASE + MAX_BUTTONS * JSON_PER_PIN;
 
@@ -28,8 +26,6 @@ struct Config {
     String server_scheme = "http";
     String server_host = "192.168.99.4";
     uint16_t server_port = 8123;
-    uint32_t sample_rate = 16000;
-    uint32_t max_secs = 60;
 
     // Hardware pins from "pins"
     uint8_t button_pins[MAX_BUTTONS] = {};
@@ -78,10 +74,8 @@ bool ConfigManager::begin() {
         cfg.server_host = doc[KEY_SERVER_HOST].as<String>();
     if (doc.containsKey(KEY_SERVER_PORT))
         cfg.server_port = doc[KEY_SERVER_PORT].as<uint16_t>();
-    if (doc.containsKey(KEY_SAMPLE_RATE))
-        cfg.sample_rate = doc[KEY_SAMPLE_RATE].as<uint32_t>();
-    if (doc.containsKey(KEY_MAX_RECORD_SECS))
-        cfg.max_secs = doc[KEY_MAX_RECORD_SECS].as<uint32_t>();
+
+    // Leftover sample_rate / max_record_secs in config.json are ignored (#29).
 
     // ── Hardware pins ─────────────────────────────
     if (doc.containsKey(KEY_PINS) && doc[KEY_PINS].is<JsonArray>()) {
@@ -115,12 +109,6 @@ const char* ConfigManager::server_host() {
 }
 uint16_t ConfigManager::server_port() {
     return cfg.server_port;
-}
-uint32_t ConfigManager::sample_rate() {
-    return cfg.sample_rate;
-}
-uint32_t ConfigManager::max_record_secs() {
-    return cfg.max_secs;
 }
 
 // ── Pin accessors ───────────────────────────────────

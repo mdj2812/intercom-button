@@ -1,11 +1,9 @@
 {
-    "_comment": "pins = hardware GPIOs. Room targets come from hello buttons after pairing. Device identity is the Wi-Fi MAC (X-Device-ID).",
+    "_comment": "pins = hardware GPIOs. Room targets come from hello buttons after pairing. sample_rate and max_record_secs come from GET /api/home_intercom/config (hello repeats them). Device identity is the Wi-Fi MAC (X-Device-ID).",
     "wifi_ssid": "your_wifi_ssid",
     "wifi_password": "your_wifi_password",
     "server_scheme": "http",
     "server_host": "192.168.99.4",
     "server_port": 8123,
-    "sample_rate": 16000,
-    "max_record_secs": 60,
     "pins": [4, 5, 12, 13]
 }
