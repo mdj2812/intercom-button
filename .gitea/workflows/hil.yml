@@ -1,6 +1,6 @@
 # Hardware-in-the-loop on butler-runner (USB ESP32).
 # GitHub is canonical; this file only runs on Gitea (`runs-on: check`).
-# Trigger: Gitea UI "Run workflow" after a mirror sync, or:
+# Auto: Gitea `push` to main (mirror sync usually emits this). Manual: Actions → HIL → Run workflow, or:
 #   POST /api/v1/repos/<owner>/intercom-button/actions/workflows/hil.yml/dispatches
 #   {"ref":"refs/heads/main"}
 #
@@ -11,6 +11,18 @@ name: HIL
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'platformio.ini'
+      - 'partitions_ota_8MB.csv'
+      - 'scripts/hil_run.sh'
+      - 'scripts/hil_confirm_test.py'
+      - 'docker/dev.sh'
+      - 'docker/Dockerfile'
+      - 'docker/.docker-image'
+      - '.gitea/workflows/hil.yml'
 
 jobs:
   hil:
