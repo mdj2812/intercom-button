@@ -169,15 +169,21 @@ bool download_and_flash() {
                 client.stop();
                 return false;
             }
-        } else if (line.startsWith("Content-Length:")) {
-            String len_str = line.substring(15);
-            len_str.trim();
-            content_length = len_str.toInt();
-        } else if (line.startsWith("X-Checksum-SHA256:")) {
-            String sha_str = line.substring(19);
-            sha_str.trim();
-            strncpy(expected_sha_hex, sha_str.c_str(), 64);
-            expected_sha_hex[64] = '\0';
+        } else {
+            // Waitress/Werkzeug title-cases headers (X-Checksum-Sha256).
+            int colon = line.indexOf(':');
+            if (colon > 0) {
+                String key = line.substring(0, colon);
+                key.toLowerCase();
+                String val = line.substring(colon + 1);
+                val.trim();
+                if (key == "content-length") {
+                    content_length = val.toInt();
+                } else if (key == "x-checksum-sha256") {
+                    strncpy(expected_sha_hex, val.c_str(), 64);
+                    expected_sha_hex[64] = '\0';
+                }
+            }
         }
 
         if (millis() - header_start > 5000) {

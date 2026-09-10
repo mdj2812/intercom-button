@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
+#include <cstdlib>
 #include <cstring>
 #include <sstream>
 
@@ -23,7 +24,8 @@ static void copy_field(char* dest, size_t dest_len, const char* src) {
 }
 
 DeviceHello::Result DeviceHello::send(const char* server_scheme, const char* server_host, uint16_t server_port,
-                                      const char* device_id, const char* firmware_version) {
+                                      const char* device_id, const char* firmware_version, const uint8_t* pins,
+                                      uint8_t pin_count) {
     Result result;
 
     if (!device_id || device_id[0] == '\0') {
@@ -40,7 +42,17 @@ DeviceHello::Result DeviceHello::send(const char* server_scheme, const char* ser
 
     String body("{\"firmware_version\":\"");
     body.concat(firmware_version ? firmware_version : "");
-    body.concat("\"}");
+    body.concat("\"");
+    if (pins && pin_count > 0) {
+        body.concat(",\"pins\":[");
+        for (uint8_t i = 0; i < pin_count; i++) {
+            if (i > 0)
+                body.concat(',');
+            body.concat(static_cast<unsigned>(pins[i]));
+        }
+        body.concat(']');
+    }
+    body.concat('}');
 
     WiFiClient plain_client;
     WiFiClientSecure secure_client;
@@ -93,7 +105,7 @@ DeviceHello::Result DeviceHello::send(const char* server_scheme, const char* ser
         return result;
     }
 
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<1024> doc;
     DeserializationError err = deserializeJson(doc, response.c_str());
     if (err) {
         result.error = "invalid json";
@@ -109,9 +121,30 @@ DeviceHello::Result DeviceHello::send(const char* server_scheme, const char* ser
         result.sample_rate = doc["sample_rate"] | 0;
         result.max_record_secs = doc["max_record_secs"] | 0;
         result.ota = doc["ota"] | false;
+        if (doc["buttons"].is<JsonObject>()) {
+            JsonObject obj = doc["buttons"].as<JsonObject>();
+            for (JsonPair kv : obj) {
+                if (result.button_count >= MAX_BUTTONS)
+                    break;
+                const char* key = kv.key().c_str();
+                if (!key || key[0] == '\0')
+                    continue;
+                char* end = nullptr;
+                long gpio = strtol(key, &end, 10);
+                if (end == key || *end != '\0' || gpio < 0 || gpio > 255)
+                    continue;
+                const char* room = kv.value().as<const char*>();
+                if (!room || room[0] == '\0')
+                    continue;
+                result.button_gpios[result.button_count] = static_cast<uint8_t>(gpio);
+                copy_field(result.button_rooms[result.button_count], MAX_ROOM_KEY_LEN, room);
+                result.button_count++;
+            }
+            result.has_buttons = result.button_count > 0;
+        }
         // Hello `room` is the device's HA area (often empty) — not the button map.
-        Serial.printf("[%s] OK name=%s rate=%u max=%us ota=%d\n", TAG, result.device_name, result.sample_rate,
-                      result.max_record_secs, result.ota ? 1 : 0);
+        Serial.printf("[%s] OK name=%s rate=%u max=%us ota=%d buttons=%u\n", TAG, result.device_name,
+                      result.sample_rate, result.max_record_secs, result.ota ? 1 : 0, result.button_count);
         return result;
     }
 

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### 🔧 Changed
+
+- OTA SHA header match is case-insensitive (`X-Checksum-Sha256` from Waitress).
+- Hello POST includes `pins` so the PWA can bind GPIOs using `GET /media_players` (home-intercom#81). An explicit hello `buttons` map is written to NVS (#39); `GET /rooms` remains the fallback until home-intercom#78 ships that field.
+
 ## [0.2.2] — 2026-09-10
 
 ### 🔧 Changed

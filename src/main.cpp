@@ -5,7 +5,9 @@
  * send WAV to Flask intercom server, which broadcasts to Home Assistant speakers.
  *
  * Each button is mapped to a target room via NVS (RoomTargetStore).
- * After hello, GET /api/home_intercom/rooms fills that map (pin index → room key).
+ * After hello, an explicit ``buttons`` map is applied when the server sends it
+ * (home-intercom#78). Otherwise GET /api/home_intercom/rooms still fills
+ * pin[i] → key[i]. GET /media_players is the PWA speaker catalog, not a room map.
  * Configuration is loaded from LittleFS /config.json at boot.
  *
  * Hardware:
@@ -77,7 +79,31 @@ static void clear_pending_wait() {
 
 static DeviceHello::Result send_hello() {
     return DeviceHello::send(ConfigManager::server_scheme(), ConfigManager::server_host(), ConfigManager::server_port(),
-                             DeviceId::mac(), FIRMWARE_VERSION);
+                             DeviceId::mac(), FIRMWARE_VERSION, active_pins, active_pin_count);
+}
+
+static void log_gpio_rooms() {
+    for (uint8_t i = 0; i < active_pin_count; i++)
+        Serial.printf("[main] GPIO%u → %s\n", active_pins[i], room_store.get_room(active_pins[i]).c_str());
+}
+
+static void apply_hello_buttons(const DeviceHello::Result& hello) {
+    uint8_t written = 0;
+    for (uint8_t i = 0; i < hello.button_count; i++) {
+        bool known = false;
+        for (uint8_t p = 0; p < active_pin_count; p++) {
+            if (active_pins[p] == hello.button_gpios[i]) {
+                known = true;
+                break;
+            }
+        }
+        if (!known)
+            continue;
+        if (room_store.set_room(hello.button_gpios[i], hello.button_rooms[i]))
+            written++;
+    }
+    Serial.printf("[main] Room map from hello (%u bindings, %u written)\n", hello.button_count, written);
+    log_gpio_rooms();
 }
 
 static void refresh_rooms_from_server() {
@@ -93,14 +119,8 @@ static void refresh_rooms_from_server() {
         return;
     }
     uint8_t written = RoomFetcher::apply(room_store, active_pins, active_pin_count, rooms);
-    Serial.printf("[main] Room map from server (%u keys, %u written)\n", rooms.count, written);
-    for (uint8_t i = 0; i < active_pin_count; i++) {
-        if (i < rooms.count)
-            Serial.printf("[main] GPIO%u → %s\n", active_pins[i], rooms.keys[i]);
-        else
-            Serial.printf("[main] GPIO%u → %s (local, no server key)\n", active_pins[i],
-                          room_store.get_room(active_pins[i]).c_str());
-    }
+    Serial.printf("[main] Room map from GET /rooms (%u keys, %u written)\n", rooms.count, written);
+    log_gpio_rooms();
 }
 
 static void finish_boot_confirm(const char* via) {
@@ -129,7 +149,9 @@ static void on_hello_ok(const DeviceHello::Result& hello, bool fetch_rooms) {
     if (hello.max_record_secs > 0) {
         MAX_RECORD_MS = hello.max_record_secs * 1000UL;
     }
-    if (fetch_rooms)
+    if (hello.has_buttons)
+        apply_hello_buttons(hello);
+    else if (fetch_rooms)
         refresh_rooms_from_server();
 }
 
@@ -213,7 +235,7 @@ void setup() {
                   ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(),
                   ConfigManager::max_record_secs());
 
-    // ── Per-button rooms: NVS (filled by GET /rooms after hello) ─
+    // ── Per-button rooms: NVS (hello buttons, else GET /rooms) ─
     if (!room_store.begin()) {
         Serial.println("[main] NVS init failed — using defaults");
     }
@@ -226,7 +248,7 @@ void setup() {
     Serial.printf("[main] %u buttons:", active_pin_count);
     for (uint8_t i = 0; i < active_pin_count; i++)
         Serial.printf(" GPIO%u", active_pins[i]);
-    Serial.println(" (targets from GET /rooms after hello)");
+    Serial.println(" (targets from hello buttons, else GET /rooms)");
 
     // ── Button manager ──────────────────────────────
     buttons.begin(active_pins, active_pin_count);
