@@ -47,6 +47,12 @@ void test_overwrite_room() {
     TEST_ASSERT_EQUAL_STRING("balcony", store.get_room(4).c_str());
 }
 
+void test_empty_nvs_unassigns_without_hardcoded_fallback() {
+    TEST_ASSERT_TRUE(store.set_room(4, ""));
+    TEST_ASSERT_EQUAL_STRING("", store.get_room(4).c_str());
+    TEST_ASSERT_EQUAL_STRING("living", store.get_room(5).c_str());
+}
+
 void test_reset_clears_all() {
     store.set_room(4, "kitchen");
     store.set_room(5, "office");
@@ -112,6 +118,7 @@ int main() {
 
     RUN_TEST(test_set_and_get_room);
     RUN_TEST(test_overwrite_room);
+    RUN_TEST(test_empty_nvs_unassigns_without_hardcoded_fallback);
     RUN_TEST(test_reset_clears_all);
     RUN_TEST(test_multiple_pins_independent);
 

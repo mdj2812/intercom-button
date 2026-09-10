@@ -102,9 +102,41 @@ void test_apply_maps_pins_by_index(void) {
     TEST_ASSERT_EQUAL(2, RoomFetcher::apply(store, pins, 4, rooms));
     TEST_ASSERT_EQUAL_STRING("living", store.get_room(4).c_str());
     TEST_ASSERT_EQUAL_STRING("bedroom", store.get_room(5).c_str());
-    // Extra pins keep hardcoded / previous NVS
-    TEST_ASSERT_EQUAL_STRING("cinema", store.get_room(12).c_str());
-    TEST_ASSERT_EQUAL_STRING("bedroom", store.get_room(13).c_str());
+    TEST_ASSERT_EQUAL_STRING("", store.get_room(12).c_str());
+    TEST_ASSERT_EQUAL_STRING("", store.get_room(13).c_str());
+}
+
+void test_apply_empty_catalog_unassigns(void) {
+    RoomTargetStore store;
+    store.begin();
+    store.set_room(4, "study");
+    store.set_room(5, "living");
+    const uint8_t pins[] = {4, 5};
+    RoomFetcher::Result rooms;
+    rooms.ok = true;
+    rooms.count = 0;
+
+    TEST_ASSERT_EQUAL(0, RoomFetcher::apply(store, pins, 2, rooms));
+    TEST_ASSERT_EQUAL_STRING("", store.get_room(4).c_str());
+    TEST_ASSERT_EQUAL_STRING("", store.get_room(5).c_str());
+}
+
+void test_apply_shrinking_catalog_clears_stale_nvs(void) {
+    RoomTargetStore store;
+    store.begin();
+    store.set_room(4, "study");
+    store.set_room(5, "living");
+    store.set_room(12, "cinema");
+    const uint8_t pins[] = {4, 5, 12};
+    RoomFetcher::Result rooms;
+    rooms.ok = true;
+    rooms.count = 1;
+    strncpy(rooms.keys[0], "office", MAX_ROOM_KEY_LEN);
+
+    TEST_ASSERT_EQUAL(1, RoomFetcher::apply(store, pins, 3, rooms));
+    TEST_ASSERT_EQUAL_STRING("office", store.get_room(4).c_str());
+    TEST_ASSERT_EQUAL_STRING("", store.get_room(5).c_str());
+    TEST_ASSERT_EQUAL_STRING("", store.get_room(12).c_str());
 }
 
 void test_apply_ignores_failed_fetch(void) {
@@ -148,6 +180,8 @@ int main(void) {
     RUN_TEST(test_fetch_array_is_rejected);
     RUN_TEST(test_fetch_https_scheme);
     RUN_TEST(test_apply_maps_pins_by_index);
+    RUN_TEST(test_apply_empty_catalog_unassigns);
+    RUN_TEST(test_apply_shrinking_catalog_clears_stale_nvs);
     RUN_TEST(test_apply_ignores_failed_fetch);
     RUN_TEST(test_apply_caps_to_pin_count);
     return UNITY_END();

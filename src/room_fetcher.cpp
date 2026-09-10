@@ -5,11 +5,13 @@
 #include <HTTPClient.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
+#include <cstdio>
 #include <cstring>
 #include <sstream>
 
 static const char* TAG = "rooms";
 static const char* ROOMS_PATH = "/api/home_intercom/rooms";
+static char last_ok_fp[96] = {};
 
 static void copy_key(char* dest, size_t dest_len, const char* src) {
     if (!dest || dest_len == 0)
@@ -56,7 +58,6 @@ RoomFetcher::Result RoomFetcher::fetch(const char* server_scheme, const char* se
 
     http.setTimeout(10000);
 
-    Serial.printf("[%s] GET %s\n", TAG, url_str.c_str());
     int code = http.GET();
     String response;
     String transport_error;
@@ -104,10 +105,28 @@ RoomFetcher::Result RoomFetcher::fetch(const char* server_scheme, const char* se
     }
 
     result.ok = true;
-    Serial.printf("[%s] OK count=%u", TAG, result.count);
-    for (uint8_t i = 0; i < result.count; i++)
-        Serial.printf(" %s", result.keys[i]);
-    Serial.println();
+
+    char fp[96];
+    size_t used = 0;
+    fp[0] = '\0';
+    for (uint8_t i = 0; i < result.count && used + 1 < sizeof(fp); i++) {
+        int w = snprintf(fp + used, sizeof(fp) - used, "%s;", result.keys[i]);
+        if (w < 0)
+            break;
+        used += static_cast<size_t>(w);
+        if (used >= sizeof(fp)) {
+            fp[sizeof(fp) - 1] = '\0';
+            break;
+        }
+    }
+    if (strcmp(fp, last_ok_fp) != 0) {
+        strncpy(last_ok_fp, fp, sizeof(last_ok_fp) - 1);
+        last_ok_fp[sizeof(last_ok_fp) - 1] = '\0';
+        Serial.printf("[%s] GET %s — OK count=%u", TAG, url_str.c_str(), result.count);
+        for (uint8_t i = 0; i < result.count; i++)
+            Serial.printf(" %s", result.keys[i]);
+        Serial.println();
+    }
     return result;
 }
 
@@ -115,13 +134,14 @@ uint8_t RoomFetcher::apply(RoomTargetStore& store, const uint8_t* pins, uint8_t 
     if (!pins || !rooms.ok)
         return 0;
 
-    uint8_t n = pin_count < rooms.count ? pin_count : rooms.count;
     uint8_t written = 0;
-    for (uint8_t i = 0; i < n; i++) {
-        if (rooms.keys[i][0] == '\0')
-            continue;
-        if (store.set_room(pins[i], rooms.keys[i]))
-            written++;
+    for (uint8_t i = 0; i < pin_count; i++) {
+        if (i < rooms.count && rooms.keys[i][0] != '\0') {
+            if (store.set_room(pins[i], rooms.keys[i]))
+                written++;
+        } else {
+            store.set_room(pins[i], "");
+        }
     }
     return written;
 }

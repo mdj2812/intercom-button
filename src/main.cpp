@@ -5,9 +5,10 @@
  * send WAV to Flask intercom server, which broadcasts to Home Assistant speakers.
  *
  * Each button is mapped to a target room via NVS (RoomTargetStore).
- * After hello, an explicit ``buttons`` map is applied when the server sends it
- * (home-intercom#78). Otherwise GET /api/home_intercom/rooms still fills
- * pin[i] → key[i]. GET /media_players is the PWA speaker catalog, not a room map.
+ * After hello (boot and idle heartbeat), an explicit ``buttons`` map is applied
+ * when the server sends it (home-intercom#78). Otherwise GET /api/home_intercom/rooms
+ * fills pin[i] → key[i]. Deleted rooms unassign leftover pins (home-intercom#74).
+ * GET /media_players is the PWA speaker catalog, not a room map.
  * Configuration is loaded from LittleFS /config.json at boot.
  *
  * Hardware:
@@ -19,7 +20,9 @@
 #include <Arduino.h>
 #include <esp_ota_ops.h>
 #include <Adafruit_NeoPixel.h>
+#include <cstdio>
 #include <Preferences.h>
+#include <cstring>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -64,6 +67,7 @@ static unsigned long pending_since_ms = 0;
 static const unsigned long HELLO_BACKOFF_MAX_MS = 60000;
 static bool confirm_dry_run = false;
 static bool confirm_skip_hello = false;
+static char last_room_fp[192] = {};
 
 static unsigned long pending_retry_delay() {
     if (pending_since_ms == 0)
@@ -83,27 +87,63 @@ static DeviceHello::Result send_hello() {
 }
 
 static void log_gpio_rooms() {
-    for (uint8_t i = 0; i < active_pin_count; i++)
-        Serial.printf("[main] GPIO%u → %s\n", active_pins[i], room_store.get_room(active_pins[i]).c_str());
+    for (uint8_t i = 0; i < active_pin_count; i++) {
+        std::string room = room_store.get_room(active_pins[i]);
+        if (room.empty())
+            Serial.printf("[main] GPIO%u → (unassigned)\n", active_pins[i]);
+        else
+            Serial.printf("[main] GPIO%u → %s\n", active_pins[i], room.c_str());
+    }
+}
+
+static void room_map_fingerprint(char* out, size_t n) {
+    size_t used = 0;
+    if (!out || n == 0)
+        return;
+    out[0] = '\0';
+    for (uint8_t i = 0; i < active_pin_count && used + 1 < n; i++) {
+        std::string room = room_store.get_room(active_pins[i]);
+        int w = snprintf(out + used, n - used, "%u=%s;", active_pins[i], room.c_str());
+        if (w < 0)
+            break;
+        used += static_cast<size_t>(w);
+        if (used >= n) {
+            out[n - 1] = '\0';
+            break;
+        }
+    }
+}
+
+static void note_room_map(const char* source, uint8_t keys, uint8_t written) {
+    char fp[192];
+    room_map_fingerprint(fp, sizeof(fp));
+    if (strcmp(fp, last_room_fp) == 0)
+        return;
+    strncpy(last_room_fp, fp, sizeof(last_room_fp) - 1);
+    last_room_fp[sizeof(last_room_fp) - 1] = '\0';
+    Serial.printf("[main] Room map from %s (%u keys, %u written)\n", source, keys, written);
+    log_gpio_rooms();
 }
 
 static void apply_hello_buttons(const DeviceHello::Result& hello) {
     uint8_t written = 0;
-    for (uint8_t i = 0; i < hello.button_count; i++) {
-        bool known = false;
-        for (uint8_t p = 0; p < active_pin_count; p++) {
-            if (active_pins[p] == hello.button_gpios[i]) {
-                known = true;
+    for (uint8_t p = 0; p < active_pin_count; p++) {
+        uint8_t pin = active_pins[p];
+        const char* room = nullptr;
+        for (uint8_t i = 0; i < hello.button_count; i++) {
+            if (hello.button_gpios[i] == pin) {
+                room = hello.button_rooms[i];
                 break;
             }
         }
-        if (!known)
-            continue;
-        if (room_store.set_room(hello.button_gpios[i], hello.button_rooms[i]))
-            written++;
+        if (room && room[0] != '\0') {
+            if (room_store.set_room(pin, room))
+                written++;
+        } else {
+            room_store.set_room(pin, "");
+        }
     }
-    Serial.printf("[main] Room map from hello (%u bindings, %u written)\n", hello.button_count, written);
-    log_gpio_rooms();
+    note_room_map("hello", hello.button_count, written);
 }
 
 static void refresh_rooms_from_server() {
@@ -114,13 +154,8 @@ static void refresh_rooms_from_server() {
                       rooms.error ? rooms.error : "error");
         return;
     }
-    if (rooms.count == 0) {
-        Serial.println("[main] Server room catalog empty — keeping local map");
-        return;
-    }
     uint8_t written = RoomFetcher::apply(room_store, active_pins, active_pin_count, rooms);
-    Serial.printf("[main] Room map from GET /rooms (%u keys, %u written)\n", rooms.count, written);
-    log_gpio_rooms();
+    note_room_map("GET /rooms", rooms.count, written);
 }
 
 static void finish_boot_confirm(const char* via) {
@@ -141,7 +176,7 @@ static void begin_confirm_dry_run(bool skip_hello) {
                   OTAManager::CONFIRM_DRY_RUN_SEC, skip_hello ? "hello skipped" : "hello");
 }
 
-static void on_hello_ok(const DeviceHello::Result& hello, bool fetch_rooms) {
+static void on_hello_ok(const DeviceHello::Result& hello) {
     hello_ok = true;
     hello_backoff_ms = 2000;
     clear_pending_wait();
@@ -151,7 +186,7 @@ static void on_hello_ok(const DeviceHello::Result& hello, bool fetch_rooms) {
     }
     if (hello.has_buttons)
         apply_hello_buttons(hello);
-    else if (fetch_rooms)
+    else
         refresh_rooms_from_server();
 }
 
@@ -389,7 +424,7 @@ void loop() {
                     break;
                 }
 
-                on_hello_ok(hello, true);
+                on_hello_ok(hello);
                 if (should_start_ota(hello)) {
                     Serial.println("[main] OTA requested by server");
                     state = State::OTA;
@@ -417,7 +452,7 @@ void loop() {
             if (millis() >= next_hello_ms) {
                 DeviceHello::Result hello = send_hello();
                 if (hello.status == DeviceHello::Status::Ok) {
-                    on_hello_ok(hello, false);
+                    on_hello_ok(hello);
                     Serial.println("[main] Hello heartbeat OK");
                     if (should_start_ota(hello)) {
                         Serial.println("[main] OTA requested by server");
@@ -488,6 +523,13 @@ void loop() {
             uint8_t gpio = active_pins[active_button_index];
             std::string room = room_store.get_room(gpio);
 
+            if (room.empty()) {
+                Serial.printf("[main] GPIO%u unassigned — skip upload\n", gpio);
+                led_blink_n(C_RED, 4, 125);
+                state = State::IDLE;
+                break;
+            }
+
             bool ok = HTTPUploader::upload(recorder.data(), recorder.total_bytes(), ConfigManager::server_scheme(),
                                            ConfigManager::server_host(), ConfigManager::server_port(), room.c_str(),
                                            DeviceId::mac());
@@ -531,7 +573,7 @@ void loop() {
                 if (DeviceHello::confirms_ota_boot(hello.status)) {
                     finish_boot_confirm("hello");
                     if (hello.status == DeviceHello::Status::Ok) {
-                        on_hello_ok(hello, true);
+                        on_hello_ok(hello);
                         led_blink_n(C_GREEN, 1, 250);
                     } else if (hello.status == DeviceHello::Status::Revoked) {
                         hello_ok = false;

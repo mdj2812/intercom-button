@@ -19,10 +19,10 @@ public:
     bool begin();
 
     /// Look up the room target for a given GPIO pin.
-    /// Priority: NVS → in-memory defaults → hardcoded defaults.
+    /// Priority: NVS (including empty = unassigned) → in-memory defaults → hardcoded.
     std::string get_room(uint8_t gpio_pin) const;
 
-    /// Store a room mapping in NVS. Takes effect immediately.
+    /// Store a room mapping in NVS. Empty string unassigns the pin (no hardcoded fallback).
     bool set_room(uint8_t gpio_pin, const std::string& room);
 
     /// Erase all per-button room mappings from NVS (reset to defaults).
