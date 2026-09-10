@@ -5,14 +5,11 @@
 /// This tests the ACTUAL behavior, not an idealized version.
 
 #include "config_manager.h"
-#include "consts.hpp"
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <unity.h>
 
-void setUp() {
-    ConfigManager::apply_audio(AUDIO_SAMPLE_RATE_DEFAULT, AUDIO_MAX_RECORD_SECS_DEFAULT);
-}
+void setUp() {}
 void tearDown() {}
 
 static void inject_and_load(const char* json) {
@@ -38,8 +35,6 @@ void test_full_config() {
     TEST_ASSERT_EQUAL_STRING("https", ConfigManager::server_scheme());
     TEST_ASSERT_EQUAL_STRING("10.0.0.1", ConfigManager::server_host());
     TEST_ASSERT_EQUAL(9999, ConfigManager::server_port());
-    TEST_ASSERT_EQUAL(AUDIO_SAMPLE_RATE_DEFAULT, ConfigManager::sample_rate());
-    TEST_ASSERT_EQUAL(AUDIO_MAX_RECORD_SECS_DEFAULT, ConfigManager::max_record_secs());
 }
 
 // ── Test 2: Scheme is normalized and invalid values are ignored ──
@@ -135,28 +130,6 @@ void test_leftover_audio_keys_are_ignored() {
     })");
 
     TEST_ASSERT_EQUAL_STRING("AudioWiFi", ConfigManager::wifi_ssid());
-    TEST_ASSERT_EQUAL(AUDIO_SAMPLE_RATE_DEFAULT, ConfigManager::sample_rate());
-    TEST_ASSERT_EQUAL(AUDIO_MAX_RECORD_SECS_DEFAULT, ConfigManager::max_record_secs());
-}
-
-void test_apply_audio_updates_runtime() {
-    ConfigManager::apply_audio(8000, 30);
-    TEST_ASSERT_EQUAL(8000, ConfigManager::sample_rate());
-    TEST_ASSERT_EQUAL(30, ConfigManager::max_record_secs());
-}
-
-void test_apply_audio_zero_keeps_current() {
-    ConfigManager::apply_audio(22050, 45);
-    ConfigManager::apply_audio(0, 0);
-    TEST_ASSERT_EQUAL(22050, ConfigManager::sample_rate());
-    TEST_ASSERT_EQUAL(45, ConfigManager::max_record_secs());
-}
-
-void test_apply_audio_out_of_range_is_ignored() {
-    ConfigManager::apply_audio(16000, 60);
-    ConfigManager::apply_audio(1000, 999);
-    TEST_ASSERT_EQUAL(16000, ConfigManager::sample_rate());
-    TEST_ASSERT_EQUAL(60, ConfigManager::max_record_secs());
 }
 
 int main() {
@@ -170,8 +143,5 @@ int main() {
     RUN_TEST(test_pins_array_selects_gpios);
     RUN_TEST(test_legacy_buttons_object_is_ignored);
     RUN_TEST(test_leftover_audio_keys_are_ignored);
-    RUN_TEST(test_apply_audio_updates_runtime);
-    RUN_TEST(test_apply_audio_zero_keeps_current);
-    RUN_TEST(test_apply_audio_out_of_range_is_ignored);
     return UNITY_END();
 }

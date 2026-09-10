@@ -87,6 +87,27 @@ void test_fetch_https_scheme(void) {
     TEST_ASSERT_TRUE(_secure_client_insecure);
 }
 
+void test_merge_audio_updates(void) {
+    ServerConfig::AudioSettings cur;
+    ServerConfig::AudioSettings next = ServerConfig::merge_audio(cur, 8000, 30);
+    TEST_ASSERT_EQUAL(8000, next.sample_rate);
+    TEST_ASSERT_EQUAL(30, next.max_record_secs);
+}
+
+void test_merge_audio_zero_keeps_current(void) {
+    ServerConfig::AudioSettings cur{22050, 45};
+    ServerConfig::AudioSettings next = ServerConfig::merge_audio(cur, 0, 0);
+    TEST_ASSERT_EQUAL(22050, next.sample_rate);
+    TEST_ASSERT_EQUAL(45, next.max_record_secs);
+}
+
+void test_merge_audio_out_of_range_is_ignored(void) {
+    ServerConfig::AudioSettings cur{16000, 60};
+    ServerConfig::AudioSettings next = ServerConfig::merge_audio(cur, 1000, 999);
+    TEST_ASSERT_EQUAL(16000, next.sample_rate);
+    TEST_ASSERT_EQUAL(60, next.max_record_secs);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_config_path);
@@ -99,5 +120,8 @@ int main(void) {
     RUN_TEST(test_fetch_connection_error);
     RUN_TEST(test_fetch_invalid_json);
     RUN_TEST(test_fetch_https_scheme);
+    RUN_TEST(test_merge_audio_updates);
+    RUN_TEST(test_merge_audio_zero_keeps_current);
+    RUN_TEST(test_merge_audio_out_of_range_is_ignored);
     return UNITY_END();
 }

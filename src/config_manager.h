@@ -16,14 +16,6 @@ const char* server_scheme();
 const char* server_host();
 uint16_t server_port();
 
-/// Audio settings: compile-time defaults, then GET /config / hello (#29).
-/// Leftover ``sample_rate`` / ``max_record_secs`` in config.json are ignored.
-uint32_t sample_rate();
-uint32_t max_record_secs();
-
-/// Apply server audio fields. Zero keeps the current value. Out-of-range is ignored.
-void apply_audio(uint32_t sample_rate, uint32_t max_record_secs);
-
 /// Active GPIO pins from config.json "pins" array.
 /// Room targets come from hello ``buttons``; these pins are hardware-only.
 const uint8_t* active_pins();

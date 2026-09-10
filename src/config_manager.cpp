@@ -15,7 +15,7 @@ static constexpr const char* KEY_SERVER_PORT = "server_port";
 static constexpr const char* KEY_PINS = "pins";
 
 // JSON document size: base fields + pin array + slack for unknown keys
-static constexpr size_t JSON_BASE = 256;   // wifi, server, audio fields
+static constexpr size_t JSON_BASE = 256;   // wifi, server fields
 static constexpr size_t JSON_PER_PIN = 50; // pin entry + leftover-key slack
 static constexpr size_t JSON_DOC_SIZE = JSON_BASE + MAX_BUTTONS * JSON_PER_PIN;
 
@@ -26,8 +26,6 @@ struct Config {
     String server_scheme = "http";
     String server_host = "192.168.99.4";
     uint16_t server_port = 8123;
-    uint32_t sample_rate = AUDIO_SAMPLE_RATE_DEFAULT;
-    uint32_t max_secs = AUDIO_MAX_RECORD_SECS_DEFAULT;
 
     // Hardware pins from "pins"
     uint8_t button_pins[MAX_BUTTONS] = {};
@@ -111,31 +109,6 @@ const char* ConfigManager::server_host() {
 }
 uint16_t ConfigManager::server_port() {
     return cfg.server_port;
-}
-uint32_t ConfigManager::sample_rate() {
-    return cfg.sample_rate;
-}
-uint32_t ConfigManager::max_record_secs() {
-    return cfg.max_secs;
-}
-
-void ConfigManager::apply_audio(uint32_t sample_rate, uint32_t max_record_secs) {
-    if (sample_rate != 0) {
-        if (sample_rate < AUDIO_SAMPLE_RATE_MIN || sample_rate > AUDIO_SAMPLE_RATE_MAX) {
-            Serial.printf("[%s] ignoring sample_rate %u (want %u–%u)\n", TAG, sample_rate, AUDIO_SAMPLE_RATE_MIN,
-                          AUDIO_SAMPLE_RATE_MAX);
-        } else {
-            cfg.sample_rate = sample_rate;
-        }
-    }
-    if (max_record_secs != 0) {
-        if (max_record_secs < AUDIO_MAX_RECORD_SECS_MIN || max_record_secs > AUDIO_MAX_RECORD_SECS_MAX) {
-            Serial.printf("[%s] ignoring max_record_secs %u (want %u–%u)\n", TAG, max_record_secs,
-                          AUDIO_MAX_RECORD_SECS_MIN, AUDIO_MAX_RECORD_SECS_MAX);
-        } else {
-            cfg.max_secs = max_record_secs;
-        }
-    }
 }
 
 // ── Pin accessors ───────────────────────────────────

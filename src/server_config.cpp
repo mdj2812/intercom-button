@@ -11,6 +11,27 @@
 
 static const char* TAG = "cfghttp";
 
+ServerConfig::AudioSettings ServerConfig::merge_audio(AudioSettings current, uint32_t sample_rate,
+                                                      uint32_t max_record_secs) {
+    if (sample_rate != 0) {
+        if (sample_rate < AUDIO_SAMPLE_RATE_MIN || sample_rate > AUDIO_SAMPLE_RATE_MAX) {
+            Serial.printf("[%s] ignoring sample_rate %u (want %u–%u)\n", TAG, sample_rate, AUDIO_SAMPLE_RATE_MIN,
+                          AUDIO_SAMPLE_RATE_MAX);
+        } else {
+            current.sample_rate = sample_rate;
+        }
+    }
+    if (max_record_secs != 0) {
+        if (max_record_secs < AUDIO_MAX_RECORD_SECS_MIN || max_record_secs > AUDIO_MAX_RECORD_SECS_MAX) {
+            Serial.printf("[%s] ignoring max_record_secs %u (want %u–%u)\n", TAG, max_record_secs,
+                          AUDIO_MAX_RECORD_SECS_MIN, AUDIO_MAX_RECORD_SECS_MAX);
+        } else {
+            current.max_record_secs = max_record_secs;
+        }
+    }
+    return current;
+}
+
 ServerConfig::Result ServerConfig::fetch(const char* server_scheme, const char* server_host, uint16_t server_port) {
     Result result;
 

@@ -53,7 +53,9 @@ enum class State { IDLE, RECORDING, UPLOADING, CONFIRMING, OTA };
 static State state = State::IDLE;
 static unsigned long record_start_ms = 0;
 static const unsigned long MIN_RECORD_MS = 500;
-static unsigned long MAX_RECORD_MS = 60000; // updated from config
+static uint32_t audio_sample_rate = AUDIO_SAMPLE_RATE_DEFAULT;
+static uint32_t audio_max_secs = AUDIO_MAX_RECORD_SECS_DEFAULT;
+static unsigned long MAX_RECORD_MS = AUDIO_MAX_RECORD_SECS_DEFAULT * 1000UL;
 static unsigned long ota_skip_until_ms = 0;
 
 static uint8_t active_button_index = 0; // which button triggered recording
@@ -168,21 +170,18 @@ static void begin_confirm_dry_run(bool skip_hello) {
 }
 
 static void apply_server_audio(uint32_t rate, uint32_t secs) {
-    const uint32_t old_rate = ConfigManager::sample_rate();
-    const uint32_t old_secs = ConfigManager::max_record_secs();
-    ConfigManager::apply_audio(rate, secs);
-    const uint32_t new_rate = ConfigManager::sample_rate();
-    const uint32_t new_secs = ConfigManager::max_record_secs();
-    MAX_RECORD_MS = new_secs * 1000UL;
-    if (new_rate == old_rate && new_secs == old_secs)
+    ServerConfig::AudioSettings next = ServerConfig::merge_audio({audio_sample_rate, audio_max_secs}, rate, secs);
+    MAX_RECORD_MS = next.max_record_secs * 1000UL;
+    if (next.sample_rate == audio_sample_rate && next.max_record_secs == audio_max_secs)
         return;
-    if (!recorder.configure(new_rate, new_secs)) {
-        ConfigManager::apply_audio(old_rate, old_secs);
-        MAX_RECORD_MS = old_secs * 1000UL;
-        Serial.printf("[main] Audio reconfigure failed — keeping %u Hz / %us\n", old_rate, old_secs);
+    if (!recorder.configure(next.sample_rate, next.max_record_secs)) {
+        MAX_RECORD_MS = audio_max_secs * 1000UL;
+        Serial.printf("[main] Audio reconfigure failed — keeping %u Hz / %us\n", audio_sample_rate, audio_max_secs);
         return;
     }
-    Serial.printf("[main] Audio from server: %u Hz, max %us\n", new_rate, new_secs);
+    audio_sample_rate = next.sample_rate;
+    audio_max_secs = next.max_record_secs;
+    Serial.printf("[main] Audio from server: %u Hz, max %us\n", audio_sample_rate, audio_max_secs);
 }
 
 static void fetch_server_audio_if_due() {
@@ -285,11 +284,11 @@ void setup() {
 
     // ── Load runtime config from LittleFS ───────────
     ConfigManager::begin();
-    MAX_RECORD_MS = ConfigManager::max_record_secs() * 1000UL;
+    MAX_RECORD_MS = audio_max_secs * 1000UL;
 
     Serial.printf("Server: %s://%s:%u | Device: %s | Audio default: %u Hz / %us\n", ConfigManager::server_scheme(),
-                  ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(),
-                  ConfigManager::sample_rate(), ConfigManager::max_record_secs());
+                  ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(), audio_sample_rate,
+                  audio_max_secs);
 
     // ── Per-button rooms: NVS, filled from hello buttons ─
     if (!room_store.begin()) {
@@ -313,7 +312,7 @@ void setup() {
     WiFiManager::begin(ConfigManager::wifi_ssid(), ConfigManager::wifi_password());
 
     // ── Audio recorder ──────────────────────────────
-    if (!recorder.begin(ConfigManager::sample_rate(), ConfigManager::max_record_secs())) {
+    if (!recorder.begin(audio_sample_rate, audio_max_secs)) {
         Serial.println("FATAL: AudioRecorder init failed");
         while (1) {
             led_blink(C_RED, 200);
