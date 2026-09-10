@@ -5,6 +5,8 @@
 #   {"ref":"refs/heads/main"}
 #
 # Host setup (once): /opt/intercom-button/hil-config.json  (see data/config.example.json)
+# NAS home-intercom (LAN OTA): SSH as marmdjtin with butler /root/.ssh/id_rsa,
+# plant via Container Station docker exec into home-intercom /data/firmware.
 name: HIL
 
 on:
@@ -12,9 +14,9 @@ on:
 
 jobs:
   hil:
-    name: Flash reserved ESP32 and confirm_test
+    name: Flash reserved ESP32, confirm_test, LAN OTA
     runs-on: check
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - name: Hardware-in-the-loop
