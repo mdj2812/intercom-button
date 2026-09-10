@@ -1,5 +1,5 @@
 {
-    "_comment": "pins = hardware GPIOs. After hello, GET /rooms assigns pin[i] → room key[i]. Device identity is the Wi-Fi MAC (X-Device-ID).",
+    "_comment": "pins = hardware GPIOs. Room targets come from hello buttons after pairing. Device identity is the Wi-Fi MAC (X-Device-ID).",
     "wifi_ssid": "your_wifi_ssid",
     "wifi_password": "your_wifi_password",
     "server_scheme": "http",

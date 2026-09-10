@@ -36,10 +36,13 @@ void test_hello_success_parses_payload(void) {
     TEST_ASSERT_EQUAL(16000, r.sample_rate);
     TEST_ASSERT_EQUAL(60, r.max_record_secs);
     TEST_ASSERT_FALSE(r.ota);
+    TEST_ASSERT_FALSE(r.buttons_field);
+    TEST_ASSERT_FALSE(r.has_buttons);
     TEST_ASSERT_EQUAL_STRING("http://ha.local:8123/api/home_intercom/devices/hello", _http_mock.last_url.c_str());
     TEST_ASSERT_EQUAL_STRING(DEVICE_MAC, _http_mock.last_device_id_header.c_str());
     TEST_ASSERT_EQUAL_STRING("application/json", _http_mock.last_content_type.c_str());
     TEST_ASSERT_TRUE(_http_mock.last_body.find("\"firmware_version\":\"0.1.0\"") != std::string::npos);
+    TEST_ASSERT_TRUE(_http_mock.last_body.find("\"pins\"") == std::string::npos);
     TEST_ASSERT_EQUAL(1, _http_mock.post_call_count);
 }
 
@@ -163,6 +166,40 @@ void test_hello_transport_errors_do_not_confirm_ota_boot(void) {
     TEST_ASSERT_FALSE(DeviceHello::confirms_ota_boot(rejected.status));
 }
 
+void test_hello_sends_pins(void) {
+    mock_http_set_response(200, R"({"status":"ok","device_name":"Btn","room":""})");
+    const uint8_t pins[] = {4, 5, 12, 13};
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.2", pins, 4);
+    TEST_ASSERT_EQUAL(static_cast<int>(DeviceHello::Status::Ok), static_cast<int>(r.status));
+    TEST_ASSERT_TRUE(_http_mock.last_body.find("\"pins\":[4,5,12,13]") != std::string::npos);
+}
+
+void test_hello_parses_buttons_map(void) {
+    mock_http_set_response(200, R"({
+        "status": "ok",
+        "device_name": "Kitchen",
+        "room": "",
+        "buttons": {"4": "study", "5": "living", "99": "cinema"}
+    })");
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.2");
+    TEST_ASSERT_TRUE(r.buttons_field);
+    TEST_ASSERT_TRUE(r.has_buttons);
+    TEST_ASSERT_EQUAL(3, r.button_count);
+    TEST_ASSERT_EQUAL(4, r.button_gpios[0]);
+    TEST_ASSERT_EQUAL_STRING("study", r.button_rooms[0]);
+    TEST_ASSERT_EQUAL(5, r.button_gpios[1]);
+    TEST_ASSERT_EQUAL_STRING("living", r.button_rooms[1]);
+    TEST_ASSERT_EQUAL(99, r.button_gpios[2]);
+}
+
+void test_hello_empty_buttons_does_not_apply(void) {
+    mock_http_set_response(200, R"({"status":"ok","device_name":"Btn","room":"","buttons":{}})");
+    DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.2");
+    TEST_ASSERT_TRUE(r.buttons_field);
+    TEST_ASSERT_FALSE(r.has_buttons);
+    TEST_ASSERT_EQUAL(0, r.button_count);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_hello_success_parses_payload);
@@ -180,5 +217,8 @@ int main(void) {
     RUN_TEST(test_parsed_hello_confirms_ota_boot);
     RUN_TEST(test_hello_ok_pending_revoked_confirm_ota_boot);
     RUN_TEST(test_hello_transport_errors_do_not_confirm_ota_boot);
+    RUN_TEST(test_hello_sends_pins);
+    RUN_TEST(test_hello_parses_buttons_map);
+    RUN_TEST(test_hello_empty_buttons_does_not_apply);
     return UNITY_END();
 }

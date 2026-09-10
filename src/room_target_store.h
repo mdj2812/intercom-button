@@ -7,7 +7,7 @@
 /// Per-GPIO-pin → room key mapping.
 ///
 /// Priority chain (first match wins):
-///   1. NVS (`btn_cfg` namespace, `btn_<gpio>` key) — runtime, filled by GET /rooms
+///   1. NVS (`btn_cfg` namespace, `btn_<gpio>` key) — runtime, hello `buttons`
 ///   2. In-memory defaults (set via `set_default_room()`)
 ///   3. Compiled-in hardcoded defaults
 ///
@@ -19,10 +19,10 @@ public:
     bool begin();
 
     /// Look up the room target for a given GPIO pin.
-    /// Priority: NVS → in-memory defaults → hardcoded defaults.
+    /// Priority: NVS (including empty = unassigned) → in-memory defaults → hardcoded.
     std::string get_room(uint8_t gpio_pin) const;
 
-    /// Store a room mapping in NVS. Takes effect immediately.
+    /// Store a room mapping in NVS. Empty string unassigns the pin (no hardcoded fallback).
     bool set_room(uint8_t gpio_pin, const std::string& room);
 
     /// Erase all per-button room mappings from NVS (reset to defaults).

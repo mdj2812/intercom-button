@@ -64,12 +64,9 @@ std::string RoomTargetStore::get_room(uint8_t gpio_pin) const {
         if (prefs.isKey(key.c_str())) {
             String room = prefs.getString(key.c_str(), "");
             prefs.end();
-            if (room.length() > 0) {
-                return std::string(room.c_str());
-            }
-        } else {
-            prefs.end();
+            return std::string(room.c_str());
         }
+        prefs.end();
     }
 
     // Tier 2 — In-memory defaults
@@ -96,9 +93,9 @@ bool RoomTargetStore::set_room(uint8_t gpio_pin, const std::string& room) {
     }
 
     std::string key = "btn_" + std::to_string(gpio_pin);
-    size_t written = prefs.putString(key.c_str(), truncated.c_str());
+    prefs.putString(key.c_str(), truncated.c_str());
     prefs.end();
-    return written > 0;
+    return true;
 }
 
 void RoomTargetStore::reset() {
