@@ -169,19 +169,20 @@ static void begin_confirm_dry_run(bool skip_hello) {
                   OTAManager::CONFIRM_DRY_RUN_SEC, skip_hello ? "hello skipped" : "hello");
 }
 
-static void apply_server_audio(uint32_t rate, uint32_t secs) {
+static bool apply_server_audio(uint32_t rate, uint32_t secs) {
     ServerConfig::AudioSettings next = ServerConfig::merge_audio({audio_sample_rate, audio_max_secs}, rate, secs);
     MAX_RECORD_MS = next.max_record_secs * 1000UL;
     if (next.sample_rate == audio_sample_rate && next.max_record_secs == audio_max_secs)
-        return;
+        return true;
     if (!recorder.configure(next.sample_rate, next.max_record_secs)) {
         MAX_RECORD_MS = audio_max_secs * 1000UL;
         Serial.printf("[main] Audio reconfigure failed — keeping %u Hz / %us\n", audio_sample_rate, audio_max_secs);
-        return;
+        return false;
     }
     audio_sample_rate = next.sample_rate;
     audio_max_secs = next.max_record_secs;
     Serial.printf("[main] Audio from server: %u Hz, max %us\n", audio_sample_rate, audio_max_secs);
+    return true;
 }
 
 static void fetch_server_audio_if_due() {
@@ -195,7 +196,11 @@ static void fetch_server_audio_if_due() {
                       AUDIO_CONFIG_RETRY_MS);
         return;
     }
-    apply_server_audio(cfg.sample_rate, cfg.max_record_secs);
+    if (!apply_server_audio(cfg.sample_rate, cfg.max_record_secs)) {
+        next_config_ms = millis() + AUDIO_CONFIG_RETRY_MS;
+        Serial.printf("[main] Audio apply failed — retry GET /config in %lu ms\n", AUDIO_CONFIG_RETRY_MS);
+        return;
+    }
     server_audio_ok = true;
 }
 

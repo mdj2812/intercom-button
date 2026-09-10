@@ -76,6 +76,9 @@ bool AudioRecorder::begin(uint32_t sample_rate, uint32_t max_secs) {
     _timer_handle = timerBegin(0, 80, true);
     if (!_timer_handle) {
         Serial.printf("[%s] FATAL: timerBegin failed\n", TAG);
+        free(_buffer_head);
+        _buffer_head = nullptr;
+        _buffer = nullptr;
         return false;
     }
     timerAttachInterrupt((hw_timer_t*) _timer_handle, &isr_trampoline, true);
@@ -89,8 +92,10 @@ bool AudioRecorder::begin(uint32_t sample_rate, uint32_t max_secs) {
 bool AudioRecorder::configure(uint32_t sample_rate, uint32_t max_secs) {
     if (sample_rate == 0 || max_secs == 0)
         return false;
-    if (_recording)
+    if (_recording) {
+        Serial.printf("[%s] configure skipped — recording\n", TAG);
         return false;
+    }
     if (_initialized && _sample_rate == sample_rate && _max_samples == sample_rate * max_secs)
         return true;
 
