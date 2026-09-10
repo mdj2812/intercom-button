@@ -14,7 +14,7 @@ constexpr uint8_t MAX_ROOM_KEY_LEN = 32;
 constexpr uint8_t MAX_DEVICE_NAME_LEN = 64;
 
 /// Reported to the server in POST /devices/hello.
-constexpr const char* FIRMWARE_VERSION = "0.2.2";
+constexpr const char* FIRMWARE_VERSION = "0.3.0";
 
 /// LAN HTTP path for server-cached firmware (GitHub assets are HTTPS-only).
 constexpr const char* FIRMWARE_HTTP_PATH = "/api/home_intercom/firmware";

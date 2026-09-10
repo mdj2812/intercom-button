@@ -296,7 +296,7 @@ make monitor
 | 烧录失败 | USB 端口不对 | `pio device list`，然后 `make flash`（自动检测） |
 | 录音但不上传 | 服务器不可达 | 检查 `data/config.json` 中的 `server_host` |
 | 上传超时（ESP32 报失败但声音已播放） | HA 响应太慢 | 已知良性问题——音频已送达，重试逻辑会处理 |
-| 上传成功但没声音 | 房间键值不对 | 确认 `GET /api/home_intercom/rooms` 的键与扬声器一致；第 *i* 个按键用第 *i* 个键。拉取成功写入 NVS 之前，使用编译期 GPIO→房间映射。 |
+| 上传成功但没声音 | 房间键值不对 | 确认 PWA 里的 GPIO→房间映射（hello `buttons`）与扬声器一致。未分配的 GPIO 不会上传。hello `{}` 空对象保留上次 NVS。 |
 | 配置不加载 | LittleFS 未烧录 | 运行 `make flashfs` 上传文件系统 |
 | PSRAM 分配警告 | 板子变体不匹配 | 检查 `platformio.ini` 中 `board_build.psram_type = opi` |
 

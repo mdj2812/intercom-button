@@ -299,7 +299,7 @@ The firmware logs every state transition:
 | Upload fails | Wrong USB port | `pio device list`, then `make flash` (auto-detects) |
 | Recording but no upload | Server unreachable | Check `server_host` in `data/config.json` |
 | Upload timeout (ESP32 says failed but audio played) | HA response too slow | Known benign issue — audio was delivered, retry logic handles it |
-| Upload OK but no sound | Wrong room key | Confirm `GET /api/home_intercom/rooms` keys match speakers; button *i* uses key *i*. Until a fetch writes NVS, the compiled GPIO→room map is used. |
+| Upload OK but no sound | Wrong room key | Confirm the PWA GPIO→room map (hello `buttons`) matches speakers. Unassigned GPIOs skip upload. Empty hello `{}` keeps last NVS. |
 | Config not loading | LittleFS not flashed | Run `make flashfs` to upload the file system |
 | PSRAM allocation warning | Board variant mismatch | Verify `board_build.psram_type = opi` in `platformio.ini` |
 

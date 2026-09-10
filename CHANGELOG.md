@@ -2,14 +2,24 @@
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-10
+
+### ⚠ Breaking
+
+- **Room map is hello `buttons` only (#39)** — the firmware no longer calls `GET /api/home_intercom/rooms` or maps `pin[i]` → catalog key `[i]`. Bind GPIOs in the Home Intercom PWA. Empty hello `{}` keeps last NVS; pins omitted from a non-empty map are unassigned and skip upload.
+- **Audio is not in `config.json` (#29, #30)** — leftover `sample_rate` / `max_record_secs` are ignored. After WiFi, `GET /api/home_intercom/config` supplies them (hello repeats). Offline boot is 16000 Hz / 60 s. `config.json` is wifi / server / `pins` only (`ha_token` and `buttons` leftovers stay ignored).
+
 ### 🔧 Changed
 
-- **Audio from the server (#29)** — `GET /api/home_intercom/config` after WiFi supplies `sample_rate` and `max_record_secs` (hello repeats them). Leftover keys in `config.json` are ignored. Offline boot uses 16000 Hz / 60 s.
+- Hello POST includes `pins` so the PWA can bind GPIOs using `GET /media_players` (home-intercom#81). Idle hello heartbeats refresh the map so a PWA edit applies without reboot (home-intercom#74).
+- Failed audio apply retries GET `/config` instead of treating the fetch as done.
+- OTA SHA header match is case-insensitive (`X-Checksum-Sha256` from Waitress).
 - Dev Docker image now preinstalls `tool-scons`, Adafruit NeoPixel, ArduinoJson, and Unity (global PIO packages, so a bind-mounted `/workspace` still sees them).
 - Gitea HIL is three jobs: compile (no USB), flash, then serial/OTA/buttons test.
-- OTA SHA header match is case-insensitive (`X-Checksum-Sha256` from Waitress).
-- Hello POST includes `pins` so the PWA can bind GPIOs using `GET /media_players` (home-intercom#81). Hello `buttons` is the GPIO→room map (#39 / home-intercom#78). Empty `{}` keeps last NVS. The firmware no longer fetches `GET /rooms` or reads a `buttons` object from `config.json`.
-- Idle hello heartbeats refresh that map so PWA add/edit/delete (home-intercom#74) is picked up without reboot. Pins omitted from a non-empty `buttons` object are unassigned. Unassigned pins skip upload.
+
+### 🏠 Home Intercom (related)
+
+- Requires a server that serves `GET /api/home_intercom/config` and hello `buttons` / `pins` (home-intercom#78 / #81 / #83). Catalog-order `/rooms` mapping is not enough.
 
 ## [0.2.2] — 2026-09-10
 
