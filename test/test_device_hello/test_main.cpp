@@ -36,6 +36,8 @@ void test_hello_success_parses_payload(void) {
     TEST_ASSERT_EQUAL(16000, r.sample_rate);
     TEST_ASSERT_EQUAL(60, r.max_record_secs);
     TEST_ASSERT_FALSE(r.ota);
+    TEST_ASSERT_FALSE(r.buttons_field);
+    TEST_ASSERT_FALSE(r.has_buttons);
     TEST_ASSERT_EQUAL_STRING("http://ha.local:8123/api/home_intercom/devices/hello", _http_mock.last_url.c_str());
     TEST_ASSERT_EQUAL_STRING(DEVICE_MAC, _http_mock.last_device_id_header.c_str());
     TEST_ASSERT_EQUAL_STRING("application/json", _http_mock.last_content_type.c_str());
@@ -180,6 +182,7 @@ void test_hello_parses_buttons_map(void) {
         "buttons": {"4": "study", "5": "living", "99": "cinema"}
     })");
     DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.2");
+    TEST_ASSERT_TRUE(r.buttons_field);
     TEST_ASSERT_TRUE(r.has_buttons);
     TEST_ASSERT_EQUAL(3, r.button_count);
     TEST_ASSERT_EQUAL(4, r.button_gpios[0]);
@@ -192,6 +195,7 @@ void test_hello_parses_buttons_map(void) {
 void test_hello_empty_buttons_does_not_apply(void) {
     mock_http_set_response(200, R"({"status":"ok","device_name":"Btn","room":"","buttons":{}})");
     DeviceHello::Result r = DeviceHello::send("http", "ha.local", 8123, DEVICE_MAC, "0.2.2");
+    TEST_ASSERT_TRUE(r.buttons_field);
     TEST_ASSERT_FALSE(r.has_buttons);
     TEST_ASSERT_EQUAL(0, r.button_count);
 }

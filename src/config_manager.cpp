@@ -93,7 +93,7 @@ bool ConfigManager::begin() {
             cfg.button_pins[cfg.button_count++] = v.as<uint8_t>();
         }
     }
-    // Leftover "buttons" {gpio: room} is ignored; rooms come from GET /rooms.
+    // Leftover "buttons" {gpio: room} is ignored; rooms come from hello.
 
     Serial.printf("[%s] Loaded: server=%s://%s:%u wifi=%s pins=%u\n", TAG, cfg.server_scheme.c_str(),
                   cfg.server_host.c_str(), cfg.server_port, cfg.wifi_ssid.c_str(), cfg.button_count);

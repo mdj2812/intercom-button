@@ -11,6 +11,8 @@ NEEDLES_IDLE = (
     "Setup complete",
     "pending verification",
     "Hello heartbeat OK",
+    "Room map from hello",
+    "Room map from GET /rooms",
     "Room map from server",
     "Waiting for approval",
     "Hello failed",
@@ -18,6 +20,8 @@ NEEDLES_IDLE = (
 
 NEEDLES_HEARTBEAT = (
     "Hello heartbeat OK",
+    "Room map from hello",
+    "Room map from GET /rooms",
     "Room map from server",
     "Hello OK",
 )
@@ -238,10 +242,15 @@ def main():
     parser.add_argument("--skip-nohello", action="store_true")
     parser.add_argument(
         "--mode",
-        choices=("dry-run", "heartbeat", "ota-watch"),
+        choices=("dry-run", "heartbeat", "ota-watch", "buttons"),
         default="dry-run",
     )
     parser.add_argument("--timeout", type=float, default=180)
+    parser.add_argument(
+        "--expect",
+        default="",
+        help="Serial substring required in buttons mode (e.g. 'GPIO4 → study')",
+    )
     args = parser.parse_args()
 
     print(f"opening {args.port} mode={args.mode}", flush=True)
@@ -251,6 +260,21 @@ def main():
     if args.mode == "ota-watch":
         run_ota_watch(fd, args.port, buf, args.timeout)
         return
+
+    if args.mode == "buttons":
+        expect = args.expect.strip()
+        if not expect:
+            print("buttons mode requires --expect", flush=True)
+            sys.exit(2)
+        print(f"--- wait hello buttons {expect!r} ---", flush=True)
+        hit, _ = wait_for(fd, (expect,), args.timeout, buf)
+        print(f"\n[hil] buttons hit={hit!r}", flush=True)
+        os.close(fd)
+        if hit is None:
+            print("TIMEOUT waiting for hello buttons map", flush=True)
+            sys.exit(8)
+        print("[hil] PASS: hello buttons map", flush=True)
+        sys.exit(0)
 
     pending, _ = wait_idle(fd, buf)
     if pending:

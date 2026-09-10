@@ -122,6 +122,7 @@ DeviceHello::Result DeviceHello::send(const char* server_scheme, const char* ser
         result.max_record_secs = doc["max_record_secs"] | 0;
         result.ota = doc["ota"] | false;
         if (doc["buttons"].is<JsonObject>()) {
+            result.buttons_field = true;
             JsonObject obj = doc["buttons"].as<JsonObject>();
             for (JsonPair kv : obj) {
                 if (result.button_count >= MAX_BUTTONS)

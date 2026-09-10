@@ -26,7 +26,7 @@ on:
 
 jobs:
   hil:
-    name: Flash reserved ESP32, confirm_test, LAN OTA
+    name: Flash reserved ESP32, confirm_test, LAN OTA, hello buttons
     runs-on: check
     timeout-minutes: 40
     steps:

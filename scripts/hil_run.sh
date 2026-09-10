@@ -21,6 +21,7 @@ NAS_DOCKER="${HIL_NAS_DOCKER:-/share/CACHEDEV1_DATA/.qpkg/container-station/bin/
 NAS_CONTAINER="${HIL_NAS_CONTAINER:-home-intercom}"
 SKIP_DRY_RUN="${HIL_SKIP_DRY_RUN:-0}"
 SKIP_OTA="${HIL_SKIP_OTA:-0}"
+SKIP_BUTTONS="${HIL_SKIP_BUTTONS:-0}"
 USB_FW_VERSION="${HIL_USB_VERSION:-0.2.0}"
 
 exec 9>"$LOCK"
@@ -122,7 +123,51 @@ manage() {
         "$HIL_SERVER/api/home_intercom/devices/manage"
 }
 
+manage_buttons() {
+    local buttons_json="$1"
+    python3 - "$HIL_SERVER" "$BOARD_MAC" "$buttons_json" <<'PY'
+import json, sys, urllib.error, urllib.request
+server, mac, buttons = sys.argv[1].rstrip("/"), sys.argv[2], json.loads(sys.argv[3])
+body = json.dumps({"mac": mac, "action": "buttons", "buttons": buttons}).encode()
+req = urllib.request.Request(
+    server + "/api/home_intercom/devices/manage",
+    data=body,
+    headers={"Content-Type": "application/json"},
+    method="POST",
+)
+try:
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        print(resp.read().decode())
+except urllib.error.HTTPError as exc:
+    print(exc.read().decode(), file=sys.stderr)
+    raise
+PY
+}
+
+hil_buttons_plan() {
+    python3 - "$HIL_SERVER" "$BOARD_MAC" <<'PY'
+import json, sys, urllib.request
+server, mac = sys.argv[1].rstrip("/"), sys.argv[2].upper().replace("-", ":")
+rooms = json.load(urllib.request.urlopen(server + "/api/home_intercom/rooms", timeout=15))
+if not isinstance(rooms, dict) or not rooms:
+    raise SystemExit("room catalog is empty")
+keys = list(rooms)
+devices = json.load(urllib.request.urlopen(server + "/api/home_intercom/devices", timeout=15))
+prev = {}
+for key, device in devices.items():
+    if str(key).upper().replace("-", ":") == mac:
+        prev = device.get("buttons") or {}
+        break
+want = keys[0]
+current = str(prev.get("4") or "")
+if current == want and len(keys) > 1:
+    want = keys[1]
+print(json.dumps({"prev": prev, "want": want, "apply": {"4": want}}, separators=(",", ":")))
+PY
+}
+
 BACKUP_ON_NAS=""
+HIL_BUTTONS_RESTORE=""
 restore_firmware_cache() {
     if [[ -z "$BACKUP_ON_NAS" ]]; then
         return 0
@@ -142,6 +187,15 @@ rm -rf \$B" || echo "WARNING: failed to restore NAS firmware cache" >&2
     BACKUP_ON_NAS=""
 }
 
+restore_hil_buttons() {
+    if [[ -z "${HIL_BUTTONS_RESTORE}" ]]; then
+        return 0
+    fi
+    echo "=== restore HIL GPIO map ==="
+    manage_buttons "$HIL_BUTTONS_RESTORE" || echo "WARNING: failed to restore HIL GPIO map" >&2
+    HIL_BUTTONS_RESTORE=""
+}
+
 trap restore_firmware_cache EXIT
 
 CONSTS_ORIG=""
@@ -152,7 +206,7 @@ restore_consts() {
         CONSTS_ORIG=""
     fi
 }
-trap 'restore_consts; restore_firmware_cache' EXIT
+trap 'restore_consts; restore_hil_buttons; restore_firmware_cache' EXIT
 
 echo "=== read MAC ==="
 wait_usb
@@ -276,6 +330,20 @@ set -e
 if [[ "$WATCH_RC" -ne 0 ]]; then
     echo "LAN OTA watch failed (rc=$WATCH_RC)" >&2
     exit "$WATCH_RC"
+fi
+
+if [[ "$SKIP_BUTTONS" != "1" ]]; then
+    echo "=== hello buttons map (home-intercom#78) ==="
+    wait_usb
+    BUTTONS_PLAN="$(hil_buttons_plan)"
+    echo "$BUTTONS_PLAN"
+    HIL_BUTTONS_RESTORE="$(python3 -c 'import json,sys; print(json.dumps(json.loads(sys.argv[1])["prev"], separators=(",", ":")))' "$BUTTONS_PLAN")"
+    BUTTONS_WANT="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["want"])' "$BUTTONS_PLAN")"
+    BUTTONS_APPLY="$(python3 -c 'import json,sys; print(json.dumps(json.loads(sys.argv[1])["apply"], separators=(",", ":")))' "$BUTTONS_PLAN")"
+    echo "$(manage_buttons "$BUTTONS_APPLY")"
+    python3 "$ROOT/scripts/hil_confirm_test.py" --port "$USB" --mode buttons \
+        --expect "GPIO4 → ${BUTTONS_WANT}" --timeout 35
+    restore_hil_buttons
 fi
 
 echo "HIL OK"

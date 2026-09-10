@@ -6,8 +6,9 @@
  *
  * Each button is mapped to a target room via NVS (RoomTargetStore).
  * After hello (boot and idle heartbeat), an explicit ``buttons`` map is applied
- * when the server sends it (home-intercom#78). Otherwise GET /api/home_intercom/rooms
- * fills pin[i] → key[i]. Deleted rooms unassign leftover pins (home-intercom#74).
+ * (home-intercom#78 / #39). Empty ``{}`` keeps last NVS. If hello omits ``buttons``
+ * (old server), GET /api/home_intercom/rooms still fills pin[i] → key[i].
+ * Pins omitted from a non-empty map are unassigned (home-intercom#74).
  * GET /media_players is the PWA speaker catalog, not a room map.
  * Configuration is loaded from LittleFS /config.json at boot.
  *
@@ -186,7 +187,7 @@ static void on_hello_ok(const DeviceHello::Result& hello) {
     }
     if (hello.has_buttons)
         apply_hello_buttons(hello);
-    else
+    else if (!hello.buttons_field)
         refresh_rooms_from_server();
 }
 
@@ -270,7 +271,7 @@ void setup() {
                   ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(),
                   ConfigManager::max_record_secs());
 
-    // ── Per-button rooms: NVS (hello buttons, else GET /rooms) ─
+    // ── Per-button rooms: NVS (hello buttons; GET /rooms if field omitted) ─
     if (!room_store.begin()) {
         Serial.println("[main] NVS init failed — using defaults");
     }
@@ -283,7 +284,7 @@ void setup() {
     Serial.printf("[main] %u buttons:", active_pin_count);
     for (uint8_t i = 0; i < active_pin_count; i++)
         Serial.printf(" GPIO%u", active_pins[i]);
-    Serial.println(" (targets from hello buttons, else GET /rooms)");
+    Serial.println(" (targets from hello buttons)");
 
     // ── Button manager ──────────────────────────────
     buttons.begin(active_pins, active_pin_count);

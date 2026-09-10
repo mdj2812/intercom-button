@@ -50,15 +50,15 @@ MAX9814 增益：将 GAIN 焊盘接地获得 50dB（桌面使用推荐）。
 | `server_scheme` | 可信局域网使用 `http`，远端 HA 使用 `https`。HTTPS 流量已加密，但当前固件暂不验证服务器证书。 |
 | `server_host` | Home Assistant 的 IP（Docker 模式填 Docker 主机 IP） |
 | `server_port` | HA 集成用 `8123`，Docker 旧模式用 `8764` |
-| `pins` | 要初始化的硬件 GPIO。顺序对应 `GET /api/home_intercom/rooms`（第 *i* 个按键 → 第 *i* 个房间键）。省略则使用编译期 `{4,5,12,13}`。遗留的 `buttons` 对象会被忽略。 |
+| `pins` | 要初始化的硬件 GPIO。省略则使用编译期 `{4,5,12,13}`。房间目标来自 hello `buttons`，不是引脚顺序。配置文件里遗留的 `buttons` 对象会被忽略。 |
 | `sample_rate` | 音频采样率，单位 Hz（默认 16000） |
 | `max_record_secs` | 最大录音时长，单位秒（默认 60） |
 
 复制 `data/config.example.json` 为 `data/config.json` 并填入你的设置。`data/config.json` 已加入 `.gitignore`——WiFi 凭证不会泄露。
 
-设备用 Wi-Fi MAC（`X-Device-ID`）表明身份。WiFi 连上后会 `POST /api/home_intercom/devices/hello`（首次信任注册），再 `GET /api/home_intercom/rooms` 按列表顺序把按键映射到房间键。空闲时每 10 秒再 hello 一次以刷新 HA 的 `last_seen` / Online。然后再向 `/api/home_intercom/device/record` 上传。ESP32 上不再保存 Home Assistant 令牌。未知或已吊销的 MAC 会收到 HTTP 403；丢失的设备可在 HA 后台吊销。心跳若收到 revoked/pending，会回到橙色等待。
+设备用 Wi-Fi MAC（`X-Device-ID`）表明身份。WiFi 连上后会 `POST /api/home_intercom/devices/hello`（首次信任注册）。hello 的 `buttons` 对象是 GPIO→房间映射（home-intercom#78）；空 `{}` 表示未配置，保留上次 NVS。空闲时每 10 秒再 hello 一次以刷新 HA 的 `last_seen` / Online，并在不重启的情况下应用 PWA 改的映射。然后再向 `/api/home_intercom/device/record` 上传。ESP32 上不再保存 Home Assistant 令牌。未知或已吊销的 MAC 会收到 HTTP 403；丢失的设备可在 HA 后台吊销。心跳若收到 revoked/pending，会回到橙色等待。
 
-**多按键部署**：烧录一次固件。哪个 GPIO 是哪个按键写在 `pins` 里。每个按键对应哪个房间由服务器房间列表顺序决定。改引脚后执行 `pio run -e esp32-s3-devkitc-1 -t uploadfs`。
+**多按键部署**：烧录一次固件。哪个 GPIO 是哪个按键写在 `pins` 里。在 Home Intercom PWA 里把每个 GPIO 绑到房间。改引脚后执行 `pio run -e esp32-s3-devkitc-1 -t uploadfs`。
 
 ## 快速开始
 
