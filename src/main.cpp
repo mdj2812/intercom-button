@@ -60,6 +60,8 @@ static unsigned long next_hello_ms = 0;
 static unsigned long hello_backoff_ms = 2000;
 static unsigned long pending_since_ms = 0;
 static const unsigned long HELLO_BACKOFF_MAX_MS = 60000;
+static bool confirm_dry_run = false;
+static bool confirm_skip_hello = false;
 
 static unsigned long pending_retry_delay() {
     if (pending_since_ms == 0)
@@ -99,6 +101,24 @@ static void refresh_rooms_from_server() {
             Serial.printf("[main] GPIO%u → %s (local, no server key)\n", active_pins[i],
                           room_store.get_room(active_pins[i]).c_str());
     }
+}
+
+static void finish_boot_confirm(const char* via) {
+    if (!confirm_dry_run)
+        OTAManager::confirm_boot();
+    Serial.printf("[main] Boot confirmed via %s%s\n", via, confirm_dry_run ? " (dry-run)" : "");
+    confirm_dry_run = false;
+    confirm_skip_hello = false;
+}
+
+static void begin_confirm_dry_run(bool skip_hello) {
+    confirm_dry_run = true;
+    confirm_skip_hello = skip_hello;
+    next_hello_ms = 0;
+    state = State::CONFIRMING;
+    confirm_deadline_ms = millis() + OTAManager::CONFIRM_DRY_RUN_SEC * 1000UL;
+    Serial.printf("[main] OTA confirm dry-run — %lu s (%s, button, or serial confirm); timeout returns to idle\n",
+                  OTAManager::CONFIRM_DRY_RUN_SEC, skip_hello ? "hello skipped" : "hello");
 }
 
 static void on_hello_ok(const DeviceHello::Result& hello, bool fetch_rooms) {
@@ -253,7 +273,8 @@ void setup() {
 
         state = State::CONFIRMING;
         confirm_deadline_ms = millis() + OTAManager::CONFIRM_TIMEOUT_SEC * 1000UL;
-        Serial.printf("[main] Confirm boot within %lu seconds (press any button)\n", OTAManager::CONFIRM_TIMEOUT_SEC);
+        Serial.printf("[main] Confirm boot within %lu seconds (hello, button, or serial confirm)\n",
+                      OTAManager::CONFIRM_TIMEOUT_SEC);
     }
 
     Serial.println("Setup complete — ready.");
@@ -276,8 +297,24 @@ void loop() {
             Serial.println("[main] Rebooting...");
             delay(100);
             ESP.restart();
+        } else if (cmd == "confirm_test" || cmd.startsWith("confirm_test ")) {
+            if (state != State::IDLE) {
+                Serial.println("[main] confirm_test only from idle");
+            } else {
+                String arg;
+                if (cmd.startsWith("confirm_test "))
+                    arg = cmd.substring(13);
+                arg.trim();
+                if (arg.length() > 0 && arg != "nohello") {
+                    Serial.printf(
+                        "[main] Unknown confirm_test arg: '%s' (try 'confirm_test' or 'confirm_test nohello')\n",
+                        arg.c_str());
+                } else {
+                    begin_confirm_dry_run(arg == "nohello");
+                }
+            }
         } else if (cmd.length() > 0) {
-            Serial.printf("[main] Unknown command: '%s' (try 'ota' or 'reboot')\n", cmd.c_str());
+            Serial.printf("[main] Unknown command: '%s' (try 'ota', 'reboot', or 'confirm_test')\n", cmd.c_str());
         }
     }
 
@@ -443,33 +480,64 @@ void loop() {
         }
 
         case State::CONFIRMING: {
-            // Blink orange — fast blink for urgency
+            was_wifi_ok = wifi_ok;
             led_blink(C_ORANGE, 300);
 
-            // Button press = user confirms boot OK
             if (event.type == ButtonManager::EventType::PRESS) {
-                OTAManager::confirm_boot();
+                finish_boot_confirm("button");
                 led_blink_n(C_GREEN, 1, 250);
-                Serial.println("[main] Boot confirmed — normal operation");
                 state = State::IDLE;
                 break;
             }
 
-            // Serial command confirm
             if (Serial.available()) {
                 String cmd = Serial.readStringUntil('\n');
                 cmd.trim();
                 if (cmd == "confirm") {
-                    OTAManager::confirm_boot();
+                    finish_boot_confirm("serial");
                     led_blink_n(C_GREEN, 1, 250);
-                    Serial.println("[main] Boot confirmed via serial");
                     state = State::IDLE;
                     break;
                 }
             }
 
-            // Timeout → rollback
+            // Hello proves the new image can reach Home Intercom. Do not start
+            // another OTA from this response (should_start_ota already skips
+            // pending-verify; after confirm the server should have cleared ota).
+            if (!confirm_skip_hello && wifi_ok && millis() >= next_hello_ms) {
+                DeviceHello::Result hello = send_hello();
+                if (DeviceHello::confirms_ota_boot(hello.status)) {
+                    finish_boot_confirm("hello");
+                    if (hello.status == DeviceHello::Status::Ok) {
+                        on_hello_ok(hello, true);
+                        led_blink_n(C_GREEN, 1, 250);
+                    } else if (hello.status == DeviceHello::Status::Revoked) {
+                        hello_ok = false;
+                        hello_backoff_ms = HELLO_REVOKED_RETRY_MS;
+                        next_hello_ms = millis() + HELLO_REVOKED_RETRY_MS;
+                    } else {
+                        hello_ok = false;
+                        unsigned long delay_ms = pending_retry_delay();
+                        next_hello_ms = millis() + delay_ms;
+                    }
+                    state = State::IDLE;
+                    break;
+                }
+                next_hello_ms = millis() + HELLO_OTA_CONFIRM_RETRY_MS;
+                Serial.printf("[main] Hello failed (%s) — retry in %lu ms\n", hello.error ? hello.error : "error",
+                              HELLO_OTA_CONFIRM_RETRY_MS);
+            }
+
             if (millis() > confirm_deadline_ms) {
+                if (confirm_dry_run) {
+                    Serial.println("[main] Boot confirmation timeout (dry-run) — returning to idle");
+                    confirm_dry_run = false;
+                    confirm_skip_hello = false;
+                    led_set(C_RED);
+                    delay(250);
+                    state = State::IDLE;
+                    break;
+                }
                 Serial.println("[main] Boot confirmation timeout — rolling back");
                 OTAManager::increment_failure();
 
@@ -477,7 +545,6 @@ void loop() {
                 if (fail_count >= OTAManager::MAX_BOOT_FAILURES) {
                     OTAManager::mark_invalid_and_rollback();
                 }
-                // Otherwise just restart — bootloader will retry same partition
                 led_set(C_RED);
                 delay(1000);
                 ESP.restart();

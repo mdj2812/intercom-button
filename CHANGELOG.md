@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### 🔧 Changed
+
+- **OTA confirm via hello (#42)** — after an OTA reboot, a parsed `/devices/hello` (`ok` / `pending` / `revoked`) marks the image valid. Button and serial `confirm` remain shortcuts. No hello within 60s still rolls back.
+- Serial `confirm_test` / `confirm_test nohello` dry-runs that window (15s) without marking the image or rolling back.
+
 ## [0.2.1] — 2026-09-09
 
 ### 🚀 Added

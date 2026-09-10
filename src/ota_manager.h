@@ -66,8 +66,11 @@ int boot_failure_count();
 /** Maximum allowed consecutive failures before permanently rejecting an image. */
 static constexpr int MAX_BOOT_FAILURES = 3;
 
-/** Seconds to wait for user confirmation before auto-rollback. */
+/** Seconds to wait for hello (or button/serial confirm) before auto-rollback. */
 static constexpr unsigned long CONFIRM_TIMEOUT_SEC = 60;
+
+/** Dry-run window for serial `confirm_test` (no mark-valid / no rollback). */
+static constexpr unsigned long CONFIRM_DRY_RUN_SEC = 15;
 
 /** Increment the consecutive boot failure counter in NVS. */
 void increment_failure();
