@@ -74,11 +74,13 @@ wait_usb() {
 
 read_mac() {
     ./docker/dev.sh python3 "$ESPTOOL" --chip esp32s3 --port "$USB" read_mac \
+        | tr -d '\r' \
         | awk 'BEGIN{IGNORECASE=1} /^MAC:/{print toupper($2); exit}'
 }
 
 normalize_mac() {
-    echo "$1" | tr '[:lower:]' '[:upper:]'
+    # esptool/docker often emit CR; Gitea logs turn that into a false mismatch.
+    echo "$1" | tr -d '\r' | tr '[:lower:]' '[:upper:]' | tr -d '[:space:]'
 }
 
 set_firmware_version() {
