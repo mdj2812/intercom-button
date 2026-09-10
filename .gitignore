@@ -1,5 +1,6 @@
 # ── PlatformIO build artifacts ─────────────────────
 .pio/
+.hil/
 
 # ── Device-specific runtime config ──────────────────
 data/config.json

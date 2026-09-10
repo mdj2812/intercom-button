@@ -59,11 +59,18 @@ jobs:
           pio platform install native
           # Trigger ESP32-S3 build to download compiler + framework (~1.5GB)
           pio run -e esp32-s3-devkitc-1
-          # upload / uploadfs tools — not pulled by a compile-only pio run
+          # Global tools/libs are COPY'd into the image. `lib/` must exist even
+          # if a package lands only under packages/ (COPY --from=pio-cache lib/).
+          mkdir -p "$HOME/.platformio/lib"
+          touch "$HOME/.platformio/lib/.keep"
           pio pkg install -g \
+            -t "platformio/tool-scons" \
             -t "platformio/tool-mkspiffs@~2.230.0" \
             -t "platformio/tool-mklittlefs@~1.203.0" \
-            -t "platformio/tool-mkfatfs@~2.0.0"
+            -t "platformio/tool-mkfatfs@~2.0.0" \
+            -l "adafruit/Adafruit NeoPixel@^1.12.0" \
+            -l "bblanchon/ArduinoJson@^6.21.0" \
+            -l "throwtheswitch/Unity"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6

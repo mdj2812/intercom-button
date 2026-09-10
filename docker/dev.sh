@@ -48,6 +48,8 @@ fi
 
 if $FORCE_BUILD; then
     echo "=== Building $IMAGE (~3GB) ==="
+    mkdir -p "$HOME/.platformio/packages" "$HOME/.platformio/lib"
+    touch "$HOME/.platformio/lib/.keep"
     DOCKER_BUILDKIT=1 docker build \
         --build-context "pio-cache=$HOME/.platformio" \
         --network host \

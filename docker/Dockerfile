@@ -37,19 +37,27 @@ RUN pio platform install "native"
 # runner pre-downloads them in the workflow, local dev via pio run.
 COPY --from=pio-cache packages/ /root/.platformio/packages/
 
+# Global libraries live here (not in the bind-mounted /workspace/.pio).
+COPY --from=pio-cache lib/ /root/.platformio/lib/
+
 WORKDIR /workspace
 ENV PLATFORMIO_CORE_DIR=/root/.platformio
 
-# Filesystem image tools used by `pio run -t upload` / uploadfs.
-# `pio run` (compile only) does not pull these, so bake them in.
+# Tools + libs the bind-mounted project still needs at runtime.
+# toolchains come from pio-cache; these are small registry packages that
+# `pio run` (on the image-build runner) does not always copy into packages/.
 RUN pio pkg install --global --silent \
+      -t "platformio/tool-scons" \
       -t "platformio/tool-mkspiffs@~2.230.0" \
       -t "platformio/tool-mklittlefs@~1.203.0" \
-      -t "platformio/tool-mkfatfs@~2.0.0"
+      -t "platformio/tool-mkfatfs@~2.0.0" \
+      -l "adafruit/Adafruit NeoPixel@^1.12.0" \
+      -l "bblanchon/ArduinoJson@^6.21.0" \
+      -l "throwtheswitch/Unity"
 
 # ── Verify toolchains ────────────────────────────────
 RUN /root/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-gcc --version && \
     echo "Toolchain OK" && \
-    pio pkg list --global --only-tools
+    pio pkg list --global
 
 CMD ["/bin/bash"]

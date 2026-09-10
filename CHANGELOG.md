@@ -4,6 +4,8 @@
 
 ### 🔧 Changed
 
+- Dev Docker image now preinstalls `tool-scons`, Adafruit NeoPixel, ArduinoJson, and Unity (global PIO packages, so a bind-mounted `/workspace` still sees them).
+- Gitea HIL is three jobs: compile (no USB), flash, then serial/OTA/buttons test.
 - OTA SHA header match is case-insensitive (`X-Checksum-Sha256` from Waitress).
 - Hello POST includes `pins` so the PWA can bind GPIOs using `GET /media_players` (home-intercom#81). Hello `buttons` is the GPIO→room map (#39 / home-intercom#78). Empty `{}` keeps last NVS. The firmware no longer fetches `GET /rooms` or reads a `buttons` object from `config.json`.
 - Idle hello heartbeats refresh that map so PWA add/edit/delete (home-intercom#74) is picked up without reboot. Pins omitted from a non-empty `buttons` object are unassigned. Unassigned pins skip upload.

@@ -4,6 +4,10 @@
 #   POST /api/v1/repos/<owner>/intercom-button/actions/workflows/hil.yml/dispatches
 #   {"ref":"refs/heads/main"}
 #
+# Jobs share firmware bins on the runner host (LittleFS contains wifi config,
+# so they are not uploaded as Actions artifacts):
+#   /var/tmp/intercom-button-hil/<run_id>
+#
 # Host setup (once): /opt/intercom-button/hil-config.json  (see data/config.example.json)
 # NAS home-intercom (LAN OTA): SSH as marmdjtin with butler /root/.ssh/id_rsa,
 # plant via Container Station docker exec into home-intercom /data/firmware.
@@ -24,14 +28,41 @@ on:
       - 'docker/.docker-image'
       - '.gitea/workflows/hil.yml'
 
+env:
+  HIL_ARTIFACT_DIR: /var/tmp/intercom-button-hil/${{ github.run_id }}
+
 jobs:
-  hil:
-    name: Flash reserved ESP32, confirm_test, LAN OTA, hello buttons
+  compile:
+    name: Compile
     runs-on: check
-    timeout-minutes: 40
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Hardware-in-the-loop
+      - name: Build USB + OTA + LittleFS images
         run: |
           chmod +x scripts/hil_run.sh scripts/hil_confirm_test.py
-          ./scripts/hil_run.sh
+          ./scripts/hil_run.sh compile
+
+  flash:
+    name: Flash
+    needs: compile
+    runs-on: check
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Flash reserved ESP32
+        run: |
+          chmod +x scripts/hil_run.sh scripts/hil_confirm_test.py
+          ./scripts/hil_run.sh flash
+
+  test:
+    name: Test
+    needs: flash
+    runs-on: check
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Serial dry-run, LAN OTA, hello buttons
+        run: |
+          chmod +x scripts/hil_run.sh scripts/hil_confirm_test.py
+          ./scripts/hil_run.sh test
