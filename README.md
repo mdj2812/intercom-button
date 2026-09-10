@@ -51,7 +51,7 @@ The same firmware binary works for all rooms — just upload a different config 
 | `server_scheme` | `http` for a trusted LAN; `https` for remote HA. HTTPS traffic is encrypted, but this firmware currently does not verify the server certificate. |
 | `server_host` | Home Assistant IP (or Docker host for legacy mode) |
 | `server_port` | `8123` for HA integration, `8764` for legacy Docker |
-| `pins` | Hardware GPIOs to initialize. Omit to use compile-time `{4,5,12,13}`. Room targets come from hello `buttons`, not pin order. A leftover `buttons` object in this file is ignored. |
+| `pins` | Hardware GPIOs to initialize. Omit to use compile-time `{4,5,12,13}`. Room targets come from hello `buttons`, not this file. |
 | `sample_rate` | Audio sample rate in Hz (default: 16000) |
 | `max_record_secs` | Maximum recording duration in seconds (default: 60) |
 
@@ -208,7 +208,6 @@ intercom-button/
 │   ├── test_http_uploader/  # HTTP upload tests
 │   ├── test_device_id/      # MAC identity tests
 │   ├── test_device_hello/   # /devices/hello registration tests
-│   ├── test_room_fetcher/   # GET /rooms catalog tests
 │   ├── test_wifi_manager/   # WiFi manager tests
 │   ├── test_button_manager/ # Button manager tests
 │   └── test_room_target_store/ # Room store tests
@@ -222,7 +221,6 @@ intercom-button/
     ├── http_uploader.h/cpp  # POST /device/record?target=<room>
     ├── device_id.h/cpp      # STA MAC → X-Device-ID
     ├── device_hello.h/cpp   # POST /devices/hello registration
-    ├── room_fetcher.h/cpp   # GET /rooms → pin[i] room map
     ├── button_manager.h/cpp # Multi-button GPIO matrix + debounce
     ├── room_target_store.h/cpp # NVS room target storage
     └── ota_manager.h/cpp    # OTA firmware update (optional)

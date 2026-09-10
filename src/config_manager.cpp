@@ -16,7 +16,7 @@ static constexpr const char* KEY_SAMPLE_RATE = "sample_rate";
 static constexpr const char* KEY_MAX_RECORD_SECS = "max_record_secs";
 static constexpr const char* KEY_PINS = "pins";
 
-// JSON document size: base fields + pin array + slack for leftover keys (e.g. "buttons")
+// JSON document size: base fields + pin array + slack for unknown keys
 static constexpr size_t JSON_BASE = 256;   // wifi, server, audio fields
 static constexpr size_t JSON_PER_PIN = 50; // pin entry + leftover-key slack
 static constexpr size_t JSON_DOC_SIZE = JSON_BASE + MAX_BUTTONS * JSON_PER_PIN;
@@ -93,7 +93,6 @@ bool ConfigManager::begin() {
             cfg.button_pins[cfg.button_count++] = v.as<uint8_t>();
         }
     }
-    // Leftover "buttons" {gpio: room} is ignored; rooms come from hello.
 
     Serial.printf("[%s] Loaded: server=%s://%s:%u wifi=%s pins=%u\n", TAG, cfg.server_scheme.c_str(),
                   cfg.server_host.c_str(), cfg.server_port, cfg.wifi_ssid.c_str(), cfg.button_count);

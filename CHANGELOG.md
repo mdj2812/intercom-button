@@ -5,7 +5,7 @@
 ### 🔧 Changed
 
 - OTA SHA header match is case-insensitive (`X-Checksum-Sha256` from Waitress).
-- Hello POST includes `pins` so the PWA can bind GPIOs using `GET /media_players` (home-intercom#81). Hello `buttons` is the GPIO→room map (#39 / home-intercom#78). Empty `{}` keeps last NVS. `GET /rooms` is only used if hello omits the field (old server).
+- Hello POST includes `pins` so the PWA can bind GPIOs using `GET /media_players` (home-intercom#81). Hello `buttons` is the GPIO→room map (#39 / home-intercom#78). Empty `{}` keeps last NVS. The firmware no longer fetches `GET /rooms` or reads a `buttons` object from `config.json`.
 - Idle hello heartbeats refresh that map so PWA add/edit/delete (home-intercom#74) is picked up without reboot. Pins omitted from a non-empty `buttons` object are unassigned. Unassigned pins skip upload.
 
 ## [0.2.2] — 2026-09-10

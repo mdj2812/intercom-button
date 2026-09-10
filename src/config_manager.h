@@ -21,8 +21,7 @@ uint32_t sample_rate();
 uint32_t max_record_secs();
 
 /// Active GPIO pins from config.json "pins" array.
-/// Room targets come from the server; these pins are hardware-only.
-/// A leftover "buttons" object in config.json is ignored.
+/// Room targets come from hello ``buttons``; these pins are hardware-only.
 const uint8_t* active_pins();
 uint8_t active_pin_count();
 

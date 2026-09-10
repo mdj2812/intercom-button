@@ -12,8 +12,6 @@ NEEDLES_IDLE = (
     "pending verification",
     "Hello heartbeat OK",
     "Room map from hello",
-    "Room map from GET /rooms",
-    "Room map from server",
     "Waiting for approval",
     "Hello failed",
 )
@@ -21,8 +19,6 @@ NEEDLES_IDLE = (
 NEEDLES_HEARTBEAT = (
     "Hello heartbeat OK",
     "Room map from hello",
-    "Room map from GET /rooms",
-    "Room map from server",
     "Hello OK",
 )
 

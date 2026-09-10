@@ -50,7 +50,7 @@ MAX9814 增益：将 GAIN 焊盘接地获得 50dB（桌面使用推荐）。
 | `server_scheme` | 可信局域网使用 `http`，远端 HA 使用 `https`。HTTPS 流量已加密，但当前固件暂不验证服务器证书。 |
 | `server_host` | Home Assistant 的 IP（Docker 模式填 Docker 主机 IP） |
 | `server_port` | HA 集成用 `8123`，Docker 旧模式用 `8764` |
-| `pins` | 要初始化的硬件 GPIO。省略则使用编译期 `{4,5,12,13}`。房间目标来自 hello `buttons`，不是引脚顺序。配置文件里遗留的 `buttons` 对象会被忽略。 |
+| `pins` | 要初始化的硬件 GPIO。省略则使用编译期 `{4,5,12,13}`。房间目标来自 hello `buttons`，不写在这个文件里。 |
 | `sample_rate` | 音频采样率，单位 Hz（默认 16000） |
 | `max_record_secs` | 最大录音时长，单位秒（默认 60） |
 
@@ -206,7 +206,6 @@ intercom-button/
 │   ├── test_http_uploader/  # HTTP 上传测试
 │   ├── test_device_id/      # MAC 身份测试
 │   ├── test_device_hello/   # /devices/hello 注册测试
-│   ├── test_room_fetcher/   # GET /rooms 房间目录测试
 │   ├── test_wifi_manager/   # WiFi 管理测试
 │   ├── test_button_manager/ # 按键管理测试
 │   └── test_room_target_store/ # 房间存储测试
@@ -219,7 +218,6 @@ intercom-button/
     ├── http_uploader.h/cpp  # POST /device/record?target=<room>
     ├── device_id.h/cpp      # STA MAC → X-Device-ID
     ├── device_hello.h/cpp   # POST /devices/hello 注册
-    ├── room_fetcher.h/cpp   # GET /rooms → 按键房间映射
     ├── button_manager.h/cpp # 多按键 GPIO 矩阵 + 消抖
     ├── room_target_store.h/cpp # NVS 房间目标存储
     └── consts.hpp           # 共享常量

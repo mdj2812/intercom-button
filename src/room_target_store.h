@@ -7,7 +7,7 @@
 /// Per-GPIO-pin → room key mapping.
 ///
 /// Priority chain (first match wins):
-///   1. NVS (`btn_cfg` namespace, `btn_<gpio>` key) — runtime, hello `buttons` or GET /rooms
+///   1. NVS (`btn_cfg` namespace, `btn_<gpio>` key) — runtime, hello `buttons`
 ///   2. In-memory defaults (set via `set_default_room()`)
 ///   3. Compiled-in hardcoded defaults
 ///

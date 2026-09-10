@@ -20,8 +20,8 @@ struct Result {
     uint32_t sample_rate = 0;     // 0 = not provided
     uint32_t max_record_secs = 0; // 0 = not provided
     bool ota = false;             // server wants this device to flash LAN firmware
-    /// Hello JSON included a ``buttons`` object (home-intercom#78). Empty ``{}`` is
-    /// unconfigured: keep NVS and do not GET /rooms. Missing field: legacy catalog map.
+    /// Hello JSON included a ``buttons`` object (home-intercom#78). Empty ``{}``
+    /// is unconfigured: keep last NVS. Missing field: same (no catalog fallback).
     bool buttons_field = false;
     /// Non-empty parsed GPIO → room map. Apply this; omitted pins are unassigned.
     bool has_buttons = false;

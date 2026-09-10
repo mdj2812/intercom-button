@@ -5,9 +5,8 @@
  * send WAV to Flask intercom server, which broadcasts to Home Assistant speakers.
  *
  * Each button is mapped to a target room via NVS (RoomTargetStore).
- * After hello (boot and idle heartbeat), an explicit ``buttons`` map is applied
- * (home-intercom#78 / #39). Empty ``{}`` keeps last NVS. If hello omits ``buttons``
- * (old server), GET /api/home_intercom/rooms still fills pin[i] → key[i].
+ * After hello (boot and idle heartbeat), a non-empty ``buttons`` map is applied
+ * (home-intercom#78 / #39). Empty ``{}`` or a missing field keeps last NVS.
  * Pins omitted from a non-empty map are unassigned (home-intercom#74).
  * GET /media_players is the PWA speaker catalog, not a room map.
  * Configuration is loaded from LittleFS /config.json at boot.
@@ -36,7 +35,6 @@
 #include "device_id.h"
 #include "http_uploader.h"
 #include "ota_manager.h"
-#include "room_fetcher.h"
 #include "room_target_store.h"
 #include "wifi_manager.h"
 
@@ -147,18 +145,6 @@ static void apply_hello_buttons(const DeviceHello::Result& hello) {
     note_room_map("hello", hello.button_count, written);
 }
 
-static void refresh_rooms_from_server() {
-    RoomFetcher::Result rooms =
-        RoomFetcher::fetch(ConfigManager::server_scheme(), ConfigManager::server_host(), ConfigManager::server_port());
-    if (!rooms.ok) {
-        Serial.printf("[main] Room fetch failed (%s) — keeping last NVS/config map\n",
-                      rooms.error ? rooms.error : "error");
-        return;
-    }
-    uint8_t written = RoomFetcher::apply(room_store, active_pins, active_pin_count, rooms);
-    note_room_map("GET /rooms", rooms.count, written);
-}
-
 static void finish_boot_confirm(const char* via) {
     if (!confirm_dry_run)
         OTAManager::confirm_boot();
@@ -187,8 +173,6 @@ static void on_hello_ok(const DeviceHello::Result& hello) {
     }
     if (hello.has_buttons)
         apply_hello_buttons(hello);
-    else if (!hello.buttons_field)
-        refresh_rooms_from_server();
 }
 
 static bool should_start_ota(const DeviceHello::Result& hello) {
@@ -271,7 +255,7 @@ void setup() {
                   ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(),
                   ConfigManager::max_record_secs());
 
-    // ── Per-button rooms: NVS (hello buttons; GET /rooms if field omitted) ─
+    // ── Per-button rooms: NVS, filled from hello buttons ─
     if (!room_store.begin()) {
         Serial.println("[main] NVS init failed — using defaults");
     }
