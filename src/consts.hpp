@@ -19,6 +19,20 @@ constexpr const char* FIRMWARE_VERSION = "0.2.2";
 /// LAN HTTP path for server-cached firmware (GitHub assets are HTTPS-only).
 constexpr const char* FIRMWARE_HTTP_PATH = "/api/home_intercom/firmware";
 
+/// GET /api/home_intercom/config — global audio settings (#29), no auth.
+constexpr const char* AUDIO_CONFIG_HTTP_PATH = "/api/home_intercom/config";
+
+/// Compile-time audio fallbacks when GET /config (and hello) have not applied yet.
+constexpr uint32_t AUDIO_SAMPLE_RATE_DEFAULT = 16000;
+constexpr uint32_t AUDIO_MAX_RECORD_SECS_DEFAULT = 60;
+constexpr uint32_t AUDIO_SAMPLE_RATE_MIN = 8000;
+constexpr uint32_t AUDIO_SAMPLE_RATE_MAX = 48000;
+constexpr uint32_t AUDIO_MAX_RECORD_SECS_MIN = 1;
+constexpr uint32_t AUDIO_MAX_RECORD_SECS_MAX = 120;
+
+/// Retry GET /config after a failed fetch (WiFi is up, server not ready yet).
+constexpr unsigned long AUDIO_CONFIG_RETRY_MS = 5000;
+
 /// After a failed flash, ignore hello `ota` until this elapses (or reboot).
 constexpr unsigned long OTA_RETRY_SKIP_MS = 5 * 60 * 1000UL;
 

@@ -86,6 +86,26 @@ bool AudioRecorder::begin(uint32_t sample_rate, uint32_t max_secs) {
     return true;
 }
 
+bool AudioRecorder::configure(uint32_t sample_rate, uint32_t max_secs) {
+    if (sample_rate == 0 || max_secs == 0)
+        return false;
+    if (_recording)
+        return false;
+    if (_initialized && _sample_rate == sample_rate && _max_samples == sample_rate * max_secs)
+        return true;
+
+    if (_timer_handle) {
+        timerAlarmDisable((hw_timer_t*) _timer_handle);
+        timerEnd((hw_timer_t*) _timer_handle);
+        _timer_handle = nullptr;
+    }
+    free(_buffer_head);
+    _buffer_head = nullptr;
+    _buffer = nullptr;
+    _initialized = false;
+    return begin(sample_rate, max_secs);
+}
+
 // ── start() / stop() ────────────────────────────────
 
 void AudioRecorder::start() {

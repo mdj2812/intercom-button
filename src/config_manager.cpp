@@ -12,8 +12,6 @@ static constexpr const char* KEY_WIFI_PASSWORD = "wifi_password";
 static constexpr const char* KEY_SERVER_SCHEME = "server_scheme";
 static constexpr const char* KEY_SERVER_HOST = "server_host";
 static constexpr const char* KEY_SERVER_PORT = "server_port";
-static constexpr const char* KEY_SAMPLE_RATE = "sample_rate";
-static constexpr const char* KEY_MAX_RECORD_SECS = "max_record_secs";
 static constexpr const char* KEY_PINS = "pins";
 
 // JSON document size: base fields + pin array + slack for unknown keys
@@ -28,8 +26,8 @@ struct Config {
     String server_scheme = "http";
     String server_host = "192.168.99.4";
     uint16_t server_port = 8123;
-    uint32_t sample_rate = 16000;
-    uint32_t max_secs = 60;
+    uint32_t sample_rate = AUDIO_SAMPLE_RATE_DEFAULT;
+    uint32_t max_secs = AUDIO_MAX_RECORD_SECS_DEFAULT;
 
     // Hardware pins from "pins"
     uint8_t button_pins[MAX_BUTTONS] = {};
@@ -78,10 +76,8 @@ bool ConfigManager::begin() {
         cfg.server_host = doc[KEY_SERVER_HOST].as<String>();
     if (doc.containsKey(KEY_SERVER_PORT))
         cfg.server_port = doc[KEY_SERVER_PORT].as<uint16_t>();
-    if (doc.containsKey(KEY_SAMPLE_RATE))
-        cfg.sample_rate = doc[KEY_SAMPLE_RATE].as<uint32_t>();
-    if (doc.containsKey(KEY_MAX_RECORD_SECS))
-        cfg.max_secs = doc[KEY_MAX_RECORD_SECS].as<uint32_t>();
+
+    // Leftover sample_rate / max_record_secs in config.json are ignored (#29).
 
     // ── Hardware pins ─────────────────────────────
     if (doc.containsKey(KEY_PINS) && doc[KEY_PINS].is<JsonArray>()) {
@@ -121,6 +117,25 @@ uint32_t ConfigManager::sample_rate() {
 }
 uint32_t ConfigManager::max_record_secs() {
     return cfg.max_secs;
+}
+
+void ConfigManager::apply_audio(uint32_t sample_rate, uint32_t max_record_secs) {
+    if (sample_rate != 0) {
+        if (sample_rate < AUDIO_SAMPLE_RATE_MIN || sample_rate > AUDIO_SAMPLE_RATE_MAX) {
+            Serial.printf("[%s] ignoring sample_rate %u (want %u–%u)\n", TAG, sample_rate, AUDIO_SAMPLE_RATE_MIN,
+                          AUDIO_SAMPLE_RATE_MAX);
+        } else {
+            cfg.sample_rate = sample_rate;
+        }
+    }
+    if (max_record_secs != 0) {
+        if (max_record_secs < AUDIO_MAX_RECORD_SECS_MIN || max_record_secs > AUDIO_MAX_RECORD_SECS_MAX) {
+            Serial.printf("[%s] ignoring max_record_secs %u (want %u–%u)\n", TAG, max_record_secs,
+                          AUDIO_MAX_RECORD_SECS_MIN, AUDIO_MAX_RECORD_SECS_MAX);
+        } else {
+            cfg.max_secs = max_record_secs;
+        }
+    }
 }
 
 // ── Pin accessors ───────────────────────────────────

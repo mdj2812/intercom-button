@@ -8,6 +8,7 @@
  * After hello (boot and idle heartbeat), a non-empty ``buttons`` map is applied
  * (home-intercom#78 / #39). Empty ``{}`` or a missing field keeps last NVS.
  * Pins omitted from a non-empty map are unassigned (home-intercom#74).
+ * GET /config supplies sample_rate and max_record_secs (#29); hello repeats them.
  * GET /media_players is the PWA speaker catalog, not a room map.
  * Configuration is loaded from LittleFS /config.json at boot.
  *
@@ -36,6 +37,7 @@
 #include "http_uploader.h"
 #include "ota_manager.h"
 #include "room_target_store.h"
+#include "server_config.h"
 #include "wifi_manager.h"
 
 // ── Globals ─────────────────────────────────────────
@@ -67,6 +69,8 @@ static const unsigned long HELLO_BACKOFF_MAX_MS = 60000;
 static bool confirm_dry_run = false;
 static bool confirm_skip_hello = false;
 static char last_room_fp[192] = {};
+static bool server_audio_ok = false;
+static unsigned long next_config_ms = 0;
 
 static unsigned long pending_retry_delay() {
     if (pending_since_ms == 0)
@@ -163,14 +167,46 @@ static void begin_confirm_dry_run(bool skip_hello) {
                   OTAManager::CONFIRM_DRY_RUN_SEC, skip_hello ? "hello skipped" : "hello");
 }
 
+static void apply_server_audio(uint32_t rate, uint32_t secs) {
+    const uint32_t old_rate = ConfigManager::sample_rate();
+    const uint32_t old_secs = ConfigManager::max_record_secs();
+    ConfigManager::apply_audio(rate, secs);
+    const uint32_t new_rate = ConfigManager::sample_rate();
+    const uint32_t new_secs = ConfigManager::max_record_secs();
+    MAX_RECORD_MS = new_secs * 1000UL;
+    if (new_rate == old_rate && new_secs == old_secs)
+        return;
+    if (!recorder.configure(new_rate, new_secs)) {
+        ConfigManager::apply_audio(old_rate, old_secs);
+        MAX_RECORD_MS = old_secs * 1000UL;
+        Serial.printf("[main] Audio reconfigure failed — keeping %u Hz / %us\n", old_rate, old_secs);
+        return;
+    }
+    Serial.printf("[main] Audio from server: %u Hz, max %us\n", new_rate, new_secs);
+}
+
+static void fetch_server_audio_if_due() {
+    if (server_audio_ok || millis() < next_config_ms)
+        return;
+    ServerConfig::Result cfg =
+        ServerConfig::fetch(ConfigManager::server_scheme(), ConfigManager::server_host(), ConfigManager::server_port());
+    if (!cfg.ok) {
+        next_config_ms = millis() + AUDIO_CONFIG_RETRY_MS;
+        Serial.printf("[main] GET /config failed (%s) — retry in %lu ms\n", cfg.error ? cfg.error : "error",
+                      AUDIO_CONFIG_RETRY_MS);
+        return;
+    }
+    apply_server_audio(cfg.sample_rate, cfg.max_record_secs);
+    server_audio_ok = true;
+}
+
 static void on_hello_ok(const DeviceHello::Result& hello) {
     hello_ok = true;
     hello_backoff_ms = 2000;
     clear_pending_wait();
     next_hello_ms = millis() + HELLO_HEARTBEAT_MS;
-    if (hello.max_record_secs > 0) {
-        MAX_RECORD_MS = hello.max_record_secs * 1000UL;
-    }
+    if (hello.sample_rate > 0 || hello.max_record_secs > 0)
+        apply_server_audio(hello.sample_rate, hello.max_record_secs);
     if (hello.has_buttons)
         apply_hello_buttons(hello);
 }
@@ -251,9 +287,9 @@ void setup() {
     ConfigManager::begin();
     MAX_RECORD_MS = ConfigManager::max_record_secs() * 1000UL;
 
-    Serial.printf("Server: %s://%s:%u | Device: %s | Max: %us\n", ConfigManager::server_scheme(),
+    Serial.printf("Server: %s://%s:%u | Device: %s | Audio default: %u Hz / %us\n", ConfigManager::server_scheme(),
                   ConfigManager::server_host(), ConfigManager::server_port(), DeviceId::mac(),
-                  ConfigManager::max_record_secs());
+                  ConfigManager::sample_rate(), ConfigManager::max_record_secs());
 
     // ── Per-button rooms: NVS, filled from hello buttons ─
     if (!room_store.begin()) {
@@ -366,6 +402,8 @@ void loop() {
             if (wifi_ok && !was_wifi_ok) {
                 next_hello_ms = 0;
                 hello_backoff_ms = 2000;
+                next_config_ms = 0;
+                server_audio_ok = false;
             }
             if (!wifi_ok) {
                 hello_ok = false;
@@ -378,6 +416,8 @@ void loop() {
                 led_blink(C_RED, 500);
                 break;
             }
+
+            fetch_server_audio_if_due();
 
             if (!hello_ok) {
                 led_pairing_blink = true;

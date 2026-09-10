@@ -4,6 +4,7 @@
 
 ### 🔧 Changed
 
+- **Audio from the server (#29)** — `GET /api/home_intercom/config` after WiFi supplies `sample_rate` and `max_record_secs` (hello repeats them). Leftover keys in `config.json` are ignored. Offline boot uses 16000 Hz / 60 s.
 - Dev Docker image now preinstalls `tool-scons`, Adafruit NeoPixel, ArduinoJson, and Unity (global PIO packages, so a bind-mounted `/workspace` still sees them).
 - Gitea HIL is three jobs: compile (no USB), flash, then serial/OTA/buttons test.
 - OTA SHA header match is case-insensitive (`X-Checksum-Sha256` from Waitress).

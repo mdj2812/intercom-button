@@ -14,6 +14,9 @@ public:
     /// @param max_secs     maximum recording duration
     bool begin(uint32_t sample_rate, uint32_t max_secs);
 
+    /// Re-apply sample rate / duration. No-op when unchanged. Fails if recording.
+    bool configure(uint32_t sample_rate, uint32_t max_secs);
+
     void start();
     uint32_t stop();
     void write_wav_header();

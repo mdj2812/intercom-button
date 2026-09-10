@@ -40,8 +40,6 @@ The same firmware binary works for all rooms — just upload a different config 
     "server_scheme": "http",
     "server_host": "192.168.99.4",
     "server_port": 8123,
-    "sample_rate": 16000,
-    "max_record_secs": 60,
     "pins": [4, 5, 12, 13]
 }
 ```
@@ -52,12 +50,10 @@ The same firmware binary works for all rooms — just upload a different config 
 | `server_host` | Home Assistant IP (or Docker host for legacy mode) |
 | `server_port` | `8123` for HA integration, `8764` for legacy Docker |
 | `pins` | Hardware GPIOs to initialize. Omit to use compile-time `{4,5,12,13}`. Room targets come from hello `buttons`, not this file. |
-| `sample_rate` | Audio sample rate in Hz (default: 16000) |
-| `max_record_secs` | Maximum recording duration in seconds (default: 60) |
 
 Copy `data/config.example.json` to `data/config.json` and fill in your settings. `data/config.json` is gitignored — WiFi credentials stay local.
 
-The device identifies itself with its Wi-Fi MAC (`X-Device-ID`). After WiFi connects it calls `POST /api/home_intercom/devices/hello` (trust-on-first-use). The hello `buttons` object is the GPIO→room map (home-intercom#78); empty `{}` means unconfigured and last NVS is kept. Hello repeats every 10 seconds while idle so Home Assistant `last_seen` / Online stay current and a PWA map edit is applied without reboot. Uploads go to `/api/home_intercom/device/record`. No Home Assistant token is stored on the ESP32. Unknown or revoked MACs receive HTTP 403; revoke a lost device from the HA UI. A heartbeat that sees revoked/pending drops back to the orange wait.
+The device identifies itself with its Wi-Fi MAC (`X-Device-ID`). After WiFi connects it calls `GET /api/home_intercom/config` for `sample_rate` / `max_record_secs` (compile-time fallback 16000 Hz / 60 s if the server is down), then `POST /api/home_intercom/devices/hello` (trust-on-first-use). The hello `buttons` object is the GPIO→room map (home-intercom#78); empty `{}` means unconfigured and last NVS is kept. Hello repeats every 10 seconds while idle so Home Assistant `last_seen` / Online stay current and a PWA map edit is applied without reboot. Uploads go to `/api/home_intercom/device/record`. No Home Assistant token is stored on the ESP32. Unknown or revoked MACs receive HTTP 403; revoke a lost device from the HA UI. A heartbeat that sees revoked/pending drops back to the orange wait.
 
 **Multi-button setup**: flash firmware once. Which GPIO is which button stays in `pins`. Bind each GPIO to a room in the Home Intercom PWA. Re-upload LittleFS with `pio run -e esp32-s3-devkitc-1 -t uploadfs` after changing pins.
 
@@ -181,8 +177,8 @@ make docker-shell
 
 - **Hold to talk**: press button → record, release → send
 - **Minimum recording**: 500ms (shorter taps are discarded)
-- **Maximum recording**: configured in `data/config.json` (`max_record_secs`, default 60 seconds)
-- **Format**: 16-bit PCM WAV, 16kHz mono
+- **Maximum recording**: from `GET /api/home_intercom/config` (and hello); compile-time fallback 60 seconds
+- **Format**: 16-bit PCM WAV, 16kHz mono (server `sample_rate`, default 16000)
 
 ## Project Structure
 
@@ -208,6 +204,7 @@ intercom-button/
 │   ├── test_http_uploader/  # HTTP upload tests
 │   ├── test_device_id/      # MAC identity tests
 │   ├── test_device_hello/   # /devices/hello registration tests
+│   ├── test_server_config/  # GET /config audio settings tests
 │   ├── test_wifi_manager/   # WiFi manager tests
 │   ├── test_button_manager/ # Button manager tests
 │   └── test_room_target_store/ # Room store tests
@@ -221,6 +218,7 @@ intercom-button/
     ├── http_uploader.h/cpp  # POST /device/record?target=<room>
     ├── device_id.h/cpp      # STA MAC → X-Device-ID
     ├── device_hello.h/cpp   # POST /devices/hello registration
+    ├── server_config.h/cpp  # GET /config audio settings
     ├── button_manager.h/cpp # Multi-button GPIO matrix + debounce
     ├── room_target_store.h/cpp # NVS room target storage
     └── ota_manager.h/cpp    # OTA firmware update (optional)
