@@ -1,0 +1,23 @@
+# Hardware-in-the-loop on butler-runner (USB ESP32).
+# GitHub is canonical; this file only runs on Gitea (`runs-on: check`).
+# Trigger: Gitea UI "Run workflow" after a mirror sync, or:
+#   POST /api/v1/repos/<owner>/intercom-button/actions/workflows/hil.yml/dispatches
+#   {"ref":"refs/heads/main"}
+#
+# Host setup (once): /opt/intercom-button/hil-config.json  (see data/config.example.json)
+name: HIL
+
+on:
+  workflow_dispatch:
+
+jobs:
+  hil:
+    name: Flash reserved ESP32 and confirm_test
+    runs-on: check
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hardware-in-the-loop
+        run: |
+          chmod +x scripts/hil_run.sh scripts/hil_confirm_test.py
+          ./scripts/hil_run.sh
