@@ -264,7 +264,10 @@ C++ code follows [`.clang-format`](.clang-format) (LLVM-based, 4-space indent, 1
 ```bash
 make format        # auto-format all source files
 make format-check  # check formatting without modifying (CI)
+make compiledb     # compile_commands.json for clangd (uses the dev Docker image)
 ```
+
+Clangd on the host cannot see `/root/.platformio` inside Docker. `make compiledb` copies the firmware packages into `.clangd-pio`, generates `compile_commands.json`, and rewrites paths. Install the **clangd** editor extension (`llvm-vs-code-extensions.vscode-clangd`), disable Microsoft C/C++ IntelliSense, then reload the window. Re-run `make compiledb` after `platformio.ini` or image changes.
 
 CI enforces formatting — PRs with style violations will fail the `format` job.
 

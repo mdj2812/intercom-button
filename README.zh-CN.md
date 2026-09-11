@@ -261,7 +261,10 @@ C++ 代码遵循 [`.clang-format`](.clang-format)（基于 LLVM，4 空格缩进
 ```bash
 make format        # 自动格式化所有源文件
 make format-check  # 检查格式但不修改（CI）
+make compiledb     # 生成 clangd 用的 compile_commands.json（走开发 Docker 镜像）
 ```
+
+宿主机上的 clangd 看不到镜像里的 `/root/.platformio`。`make compiledb` 会把固件用到的包拷到 `.clangd-pio`，生成 `compile_commands.json` 并改写路径。安装 **clangd** 扩展并关掉 Microsoft C/C++ IntelliSense，然后重新加载窗口。`platformio.ini` 或镜像更新后再跑一次 `make compiledb`。
 
 CI 强制格式检查——违反格式规则的 PR 会通不过 `format` 任务。
 
