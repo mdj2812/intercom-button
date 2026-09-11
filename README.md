@@ -59,6 +59,8 @@ The device identifies itself with its Wi-Fi MAC (`X-Device-ID`). After WiFi conn
 
 ## Quick Start
 
+First board: USB `make flash` then `make flashfs`. Later upgrades: leave the GitHub `.bin` and `.sig` on the release; Home Intercom **Update** does LAN OTA. The `.sig` is verified on the device, not used to sign. Details under [GitHub release](#github-release) and [LAN OTA](#lan-ota).
+
 ### With Make (recommended)
 
 ```bash
@@ -126,9 +128,55 @@ Raw PlatformIO commands (if you prefer):
 
 ### Flash via USB (first time)
 
-1. Connect ESP32-S3 via Micro-USB
-2. `make flash`
-3. `make flashfs`   (after editing `data/config.json`)
+USB is first install and recovery. It writes the bootloader, this project's 8MB OTA partition table, and the factory app. The release `.sig` is **not** used on USB.
+
+1. Connect the ESP32-S3 over USB
+2. `make flash` (or `make docker-flash`)
+3. `make flashfs` after editing `data/config.json`
+
+A blank board should be flashed from the git tag that matches the firmware version you want, so bootloader, partitions, and app stay together. LittleFS (`config.json`) is never in the GitHub release.
+
+### GitHub release
+
+Each [GitHub Release](https://github.com/mdj2812/intercom-button/releases) publishes:
+
+| Asset | What it is |
+|-------|------------|
+| `intercom-button-vX.Y.Z.bin` | Application image (factory slot at `0x10000`) |
+| `intercom-button-vX.Y.Z.bin.sig` | 64-byte ECDSA secp256r1 signature of the SHA-256 of that `.bin` (raw r and s, 32 bytes each) |
+
+CI signs the `.bin` with repo secret `OTA_PRIVATE_KEY`. The matching **public** key is compiled into the firmware (`src/ota_keys.h`). You never need the private key. The board does **not** sign firmware; OTA only **verifies** a signature that already exists.
+
+**USB from the release `.bin`:** flash the `.bin` only — do not write the `.sig` to flash. This overwrites the factory app at `0x10000` and assumes the chip already has this repo's partition table (after a previous `make flash`).
+
+```bash
+esptool.py --chip esp32s3 --before default_reset --after hard_reset \
+  write_flash --flash_mode dio --flash_size 8MB \
+  0x10000 intercom-button-vX.Y.Z.bin
+```
+
+Then upload your own LittleFS with `make flashfs`.
+
+### LAN OTA
+
+The ESP32 OTA client is **HTTP-only**. It cannot download GitHub assets (HTTPS). [home-intercom](https://github.com/mdj2812/home-intercom) fetches the latest GitHub `.bin` and `.sig`, caches them, and serves:
+
+- `GET /api/home_intercom/firmware` with `X-Checksum-SHA256`
+- `GET /api/home_intercom/firmware.sig`
+
+In the Home Intercom PWA, **Update** on a device caches that image and sets the next hello to `"ota": true`. The idle button then:
+
+1. Downloads `.sig` (exactly 64 bytes, or skips ECDSA if it is missing)
+2. Downloads `.bin` and hashes it
+3. Requires the SHA-256 header to match when present
+4. If a `.sig` was present, verifies ECDSA against the **currently running** public key
+5. Writes the inactive OTA slot and reboots (LED is solid orange while flashing)
+
+A bad checksum or bad `.sig` aborts; the running image stays. A missing `.sig` still flashes using SHA-256 only (or with a warning if the header is also absent).
+
+After reboot, a parsed `/devices/hello` (`ok` / `pending` / `revoked`) within 60 seconds marks the image valid. A button press or serial `confirm` is a shortcut. No confirm in 60s rolls back. Serial `ota` while idle also starts a download from the same LAN URLs.
+
+**Public-key rotation:** if `ota_keys.h` changed since the board last updated, a GitHub `.sig` will fail ECDSA until that board takes the new image once over USB (or unsigned OTA).
 
 ### Docker-specific
 
@@ -168,6 +216,7 @@ make docker-shell
 | 🟢 Green | Ready (WiFi connected, registered, idle) |
 | 🔴 Red blinking | WiFi disconnected |
 | 🟠 Orange blinking | Registering with the server (`/devices/hello`) |
+| 🟠 Orange solid | LAN OTA download / flash in progress |
 | 🔵 Blue | Recording |
 | ⚪ White blinking | Uploading |
 | 🟢 Flash ×4 | Upload success |
@@ -223,7 +272,8 @@ intercom-button/
     ├── server_config.h/cpp  # GET /config audio settings
     ├── button_manager.h/cpp # Multi-button GPIO matrix + debounce
     ├── room_target_store.h/cpp # NVS room target storage
-    └── ota_manager.h/cpp    # OTA firmware update (optional)
+    ├── ota_keys.h           # Compiled-in ECDSA public key (verify only)
+    └── ota_manager.h/cpp    # LAN OTA download, SHA-256 + ECDSA verify
 ```
 
 ## Environments
@@ -307,6 +357,10 @@ The firmware logs every state transition:
 | Upload OK but no sound | Wrong room key | Confirm the PWA GPIO→room map (hello `buttons`) matches speakers. Unassigned GPIOs skip upload. Empty hello `{}` keeps last NVS. |
 | Config not loading | LittleFS not flashed | Run `make flashfs` to upload the file system |
 | PSRAM allocation warning | Board variant mismatch | Verify `board_build.psram_type = opi` in `platformio.ini` |
+| `[ota] FAILED: ECDSA signature invalid` | Running image has a different public key, or `.sig` does not match the `.bin` | USB-flash the matching tag once (or OTA without a `.sig`); do not copy `.sig` onto the chip |
+| `[ota] SHA-256 mismatch` | Cached firmware vs `X-Checksum-SHA256` disagree | Re-run PWA **Update** so home-intercom recaches GitHub `.bin` / `.sig` |
+| New image rolls back after ~60s | Hello did not confirm the boot | Leave the panel on the LAN so hello succeeds, or serial `confirm` / press a button |
+| PWA Update does nothing on the button | GitHub assets are HTTPS; the ESP32 never fetches them itself | Confirm home-intercom cached the release and the next hello has `"ota": true` |
 
 ### Inspect build details
 

@@ -58,6 +58,8 @@ MAX9814 增益：将 GAIN 焊盘接地获得 50dB（桌面使用推荐）。
 
 ## 快速开始
 
+第一块板：USB `make flash`，再 `make flashfs`。之后升级：把 GitHub 的 `.bin` 和 `.sig` 留在 Release 上，由 Home Intercom **Update** 走局域网 OTA。`.sig` 在设备上校验，不是用来现场签名的。详见 [GitHub Release](#github-release) 和 [局域网 OTA](#局域网-ota)。
+
 ### 使用 Make（推荐）
 
 ```bash
@@ -125,9 +127,55 @@ Docker 变体：加 `docker-` 前缀（如 `make docker-build`、`make docker-fl
 
 ### 首次 USB 烧录
 
-1. 用 Micro-USB 连接 ESP32-S3
-2. `make flash`
-3. `make flashfs`（编辑好 `data/config.json` 后）
+USB 用于首次安装和恢复。会写入 bootloader、本仓库的 8MB OTA 分区表，以及 factory 分区里的应用。GitHub 上的 `.sig` **不会**在 USB 烧录时使用。
+
+1. 用 USB 连接 ESP32-S3
+2. `make flash`（或 `make docker-flash`）
+3. 编辑好 `data/config.json` 后执行 `make flashfs`
+
+空白板请从与目标版本一致的 git tag 编译烧录，这样 bootloader、分区表和应用是一套的。LittleFS（`config.json`）从不随 GitHub Release 发布。
+
+### GitHub Release
+
+每个 [GitHub Release](https://github.com/mdj2812/intercom-button/releases) 会发布：
+
+| 资源 | 含义 |
+|------|------|
+| `intercom-button-vX.Y.Z.bin` | 应用镜像（factory 分区，地址 `0x10000`） |
+| `intercom-button-vX.Y.Z.bin.sig` | 对该 `.bin` 的 SHA-256 做 ECDSA secp256r1 签名后的 64 字节（原始 r、s 各 32 字节） |
+
+CI 用仓库密钥 `OTA_PRIVATE_KEY` **签名** `.bin`。对应的**公钥**编译进固件（`src/ota_keys.h`）。使用者不需要私钥。板子**不会**给固件签名；OTA 只**校验**已经签好的 `.sig`。
+
+**用 Release 的 `.bin` 做 USB 烧录：** 只烧 `.bin`，不要把 `.sig` 写进 Flash。这会覆盖 `0x10000` 的 factory 应用，并假定芯片上已有本仓库的分区表（此前做过一次 `make flash`）。
+
+```bash
+esptool.py --chip esp32s3 --before default_reset --after hard_reset \
+  write_flash --flash_mode dio --flash_size 8MB \
+  0x10000 intercom-button-vX.Y.Z.bin
+```
+
+然后用自己的配置执行 `make flashfs`。
+
+### 局域网 OTA
+
+ESP32 的 OTA 客户端**只走 HTTP**，不能直接下 GitHub 资源（HTTPS）。[home-intercom](https://github.com/mdj2812/home-intercom) 会把最新的 GitHub `.bin` 和 `.sig` 缓存下来，在局域网提供：
+
+- `GET /api/home_intercom/firmware`（带 `X-Checksum-SHA256`）
+- `GET /api/home_intercom/firmware.sig`
+
+在 Home Intercom PWA 里对该设备点 **Update** 会缓存镜像，并让下一次 hello 带上 `"ota": true`。空闲中的按键随后会：
+
+1. 下载 `.sig`（正好 64 字节；没有则跳过 ECDSA）
+2. 下载 `.bin` 并计算哈希
+3. 若有 SHA-256 头则必须一致
+4. 若已拿到 `.sig`，用**当前正在运行的固件**里的公钥做 ECDSA 校验
+5. 写入空闲 OTA 分区并重启（烧录过程中 LED 为橙色常亮）
+
+校验和或 `.sig` 不对会中止，继续跑旧镜像。没有 `.sig` 时仍可用 SHA-256 烧录（连校验和头也没有则只打警告）。
+
+重启后，60 秒内成功解析 `/devices/hello`（`ok` / `pending` / `revoked`）会把新镜像标为有效。按任意键或串口输入 `confirm` 是快捷方式。超时会回滚。空闲时串口输入 `ota` 也会从同一组局域网 URL 下载。
+
+**公钥轮换：** 若板子上一次升级之后 `ota_keys.h` 已更换，GitHub 的 `.sig` 会 ECDSA 失败，需要先用 USB（或无签名 OTA）装一次带新公钥的镜像。
 
 ### Docker 专用
 
@@ -167,6 +215,7 @@ make docker-shell
 | 🟢 绿色 | 就绪（WiFi 已连接、已注册、空闲） |
 | 🔴 红色闪烁 | WiFi 断开 |
 | 🟠 橙色闪烁 | 正在向服务器注册（`/devices/hello`） |
+| 🟠 橙色常亮 | 局域网 OTA 下载 / 烧录中 |
 | 🔵 蓝色 | 录音中 |
 | ⚪ 白色闪烁 | 上传中 |
 | 🟢 闪 4 次 | 上传成功 |
@@ -220,6 +269,8 @@ intercom-button/
     ├── server_config.h/cpp  # GET /config 音频设置
     ├── button_manager.h/cpp # 多按键 GPIO 矩阵 + 消抖
     ├── room_target_store.h/cpp # NVS 房间目标存储
+    ├── ota_keys.h           # 编译进固件的 ECDSA 公钥（仅校验）
+    ├── ota_manager.h/cpp    # 局域网 OTA 下载，SHA-256 + ECDSA 校验
     └── consts.hpp           # 共享常量
 ```
 
@@ -304,6 +355,10 @@ make monitor
 | 上传成功但没声音 | 房间键值不对 | 确认 PWA 里的 GPIO→房间映射（hello `buttons`）与扬声器一致。未分配的 GPIO 不会上传。hello `{}` 空对象保留上次 NVS。 |
 | 配置不加载 | LittleFS 未烧录 | 运行 `make flashfs` 上传文件系统 |
 | PSRAM 分配警告 | 板子变体不匹配 | 检查 `platformio.ini` 中 `board_build.psram_type = opi` |
+| `[ota] FAILED: ECDSA signature invalid` | 当前镜像公钥不一致，或 `.sig` 与 `.bin` 不匹配 | 用对应 tag USB 烧一次（或无 `.sig` 的 OTA）；不要把 `.sig` 写进芯片 |
+| `[ota] SHA-256 mismatch` | 缓存固件与 `X-Checksum-SHA256` 不一致 | 再点一次 PWA **Update**，让 home-intercom 重新缓存 GitHub `.bin` / `.sig` |
+| 新镜像约 60 秒后回滚 | hello 没有确认这次启动 | 保持面板在局域网让 hello 成功，或串口 `confirm` / 按一下键 |
+| PWA Update 后面板没有动作 | GitHub 资源是 HTTPS，ESP32 不会自己去拉 | 确认 home-intercom 已缓存该 Release，且下一次 hello 带 `"ota": true` |
 
 ### 查看编译详情
 
