@@ -422,12 +422,79 @@ EOF
 }
 
 # Pending hello does not start OTA (should_start_ota only on status ok).
-# 9C:B8 still had ota_requested from a PWA Update, so the first hello after USB
-# flash began a signed GitHub OTA and confirm_test was ignored (state OTA).
+# Leftover ota_requested (PWA Update) still fires after approve, so also cancel it.
 hold_hello_pending() {
     BOARD_MAC="$(normalize_mac "$HIL_MAC")"
     echo "=== deapprove $BOARD_MAC (no hello ota until after confirm_test) ==="
     echo "$(manage deapprove)"
+    cancel_leftover_ota
+}
+
+cancel_leftover_ota() {
+    echo "=== cancel leftover ota $BOARD_MAC ==="
+    local resp
+    resp="$(manage ota_cancel)"
+    echo "$resp"
+    if echo "$resp" | grep -q '"ota_requested":false'; then
+        return 0
+    fi
+    set +e
+    python3 - "$HIL_SERVER" "$BOARD_MAC" <<'PY'
+import json, sys, urllib.request
+server, mac = sys.argv[1].rstrip("/"), sys.argv[2].upper().replace("-", ":")
+devices = json.load(urllib.request.urlopen(server + "/api/home_intercom/devices", timeout=15))
+wanted = False
+for key, device in devices.items():
+    if str(key).upper().replace("-", ":") == mac:
+        wanted = bool(device.get("ota_requested"))
+        break
+if not wanted:
+    print("no leftover ota_requested — skip NAS registry rewrite", flush=True)
+    raise SystemExit(0)
+print("ota_cancel not on server and ota_requested is set — rewrite registry + restart", flush=True)
+raise SystemExit(2)
+PY
+    local need_restart=$?
+    set -e
+    if [[ "$need_restart" -eq 0 ]]; then
+        return 0
+    fi
+    echo "=== rewrite device_registry.json and restart $NAS_CONTAINER ==="
+    nas_ssh "export PATH=$(dirname "$NAS_DOCKER"):\$PATH
+set -e
+MAC=$(printf '%q' "$BOARD_MAC")
+docker exec -u root $NAS_CONTAINER python3 -c \"
+import json
+from pathlib import Path
+p = Path('/data/device_registry.json')
+data = json.loads(p.read_text())
+mac = '$BOARD_MAC'.upper()
+devices = data.get('devices') or {}
+key = next((k for k in devices if str(k).upper().replace('-', ':') == mac), None)
+if key is None:
+    raise SystemExit('MAC not in device_registry.json')
+devices[key]['ota_requested'] = False
+devices[key]['ota_target_version'] = ''
+p.write_text(json.dumps(data, indent=2) + chr(10))
+print('cleared ota on', key)
+\"
+docker restart $NAS_CONTAINER"
+    python3 - "$HIL_SERVER" <<'PY'
+import sys, time, urllib.error, urllib.request
+url = sys.argv[1].rstrip("/") + "/api/home_intercom/devices"
+deadline = time.time() + 60
+last = None
+while time.time() < deadline:
+    try:
+        urllib.request.urlopen(url, timeout=5).read()
+        print("NAS home-intercom is up", flush=True)
+        raise SystemExit(0)
+    except Exception as exc:
+        last = exc
+        time.sleep(1)
+print("NAS home-intercom did not come back:", last, file=sys.stderr)
+sys.exit(1)
+PY
 }
 
 do_flash() {
