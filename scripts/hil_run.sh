@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Hardware-in-the-loop on butler-runner (Gitea `check:host`).
 # Phases: compile | flash | test | all (default).
-# USB-flashes a baseline image, runs confirm_test, then plants the branch
-# firmware on the LAN server and waits for LAN OTA + hello confirm.
+# USB-flashes a baseline image, runs confirm_test, then plants a *signed*
+# branch firmware on the LAN server (ECDSA + X-Checksum-SHA256). A tampered
+# .sig and checksum must fail before the good image boots and hello-confirms.
 #
 # Gitea Actions (`.gitea/workflows/hil.yml`) passes repo variables into these
 # HIL_* env vars. There are no lab defaults in this file — unset required
 # vars fail the job. Wifi stays in HIL_CONFIG on the runner (not a variable).
 # SSH uses the runner's default identity (optional HIL_SSH_KEY for -i).
 # `docker` on the SSH host: set HIL_DOCKER on the runner if it is not on PATH.
+# Signing: Gitea secret OTA_PRIVATE_KEY (same PEM as GitHub) or HIL_OTA_KEY path.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -18,9 +20,9 @@ usage() {
     cat <<'EOF'
 Usage: scripts/hil_run.sh [compile|flash|test|all]
 
-  compile  Build OTA + USB images and LittleFS (no USB required)
+  compile  Build OTA + USB images, sign the OTA bin, LittleFS (no USB)
   flash    Write compile artifacts to the reserved ESP32
-  test     Serial dry-run, LAN OTA, hello buttons
+  test     Serial dry-run, signed LAN OTA (tamper + good), hello buttons
   all      compile + flash + test (default)
 EOF
 }
@@ -50,6 +52,7 @@ HIL_SSH_USER="${HIL_SSH_USER:-}"
 HIL_CONTAINER="${HIL_CONTAINER:-}"
 SKIP_DRY_RUN="${HIL_SKIP_DRY_RUN:-0}"
 SKIP_OTA="${HIL_SKIP_OTA:-0}"
+SKIP_TAMPER="${HIL_SKIP_TAMPER:-0}"
 SKIP_BUTTONS="${HIL_SKIP_BUTTONS:-0}"
 USB_FW_VERSION="${HIL_USB_VERSION:-0.2.0}"
 LITTLEFS_OFFSET="${HIL_LITTLEFS_OFFSET:-0x610000}"
@@ -357,6 +360,154 @@ print(json.dumps({"prev": prev, "want": want, "apply": {"4": want}}, separators=
 PY
 }
 
+write_ota_json() {
+    local sha="$1"
+    local dest="$2"
+    python3 - "$OTA_VERSION" "$sha" <<'PY' >"$dest"
+import json, sys
+print(json.dumps({
+    "version": sys.argv[1],
+    "sha256": sys.argv[2],
+    "tag": "hil-ota",
+    "asset": "firmware.bin",
+}, indent=2))
+PY
+}
+
+assert_ota_key_matches_firmware() {
+    local key="$1"
+    python3 - "$key" "$ROOT/src/ota_keys.h" <<'PY'
+import re, subprocess, sys
+from pathlib import Path
+
+key_path, header_path = sys.argv[1], sys.argv[2]
+text = Path(header_path).read_text()
+chunk = text.split("OTA_PUBLIC_KEY[]", 1)[1].split(";", 1)[0]
+want = bytes(int(x, 16) for x in re.findall(r"0x([0-9a-fA-F]{2})", chunk))
+if len(want) != 65:
+    raise SystemExit(f"{header_path} public key is {len(want)} bytes, want 65")
+der = subprocess.check_output(
+    ["openssl", "ec", "-in", key_path, "-pubout", "-conv_form", "uncompressed", "-outform", "DER"],
+    stderr=subprocess.DEVNULL,
+)
+if want not in der:
+    raise SystemExit("OTA_PRIVATE_KEY / HIL_OTA_KEY does not match src/ota_keys.h")
+print("OTA signing key matches src/ota_keys.h", flush=True)
+PY
+}
+
+sign_ota_bin() {
+    local key sig n
+    if ! command -v openssl >/dev/null 2>&1; then
+        echo "openssl is required to sign the HIL OTA image" >&2
+        exit 1
+    fi
+    key="$(mktemp)"
+    chmod 600 "$key"
+    if [[ -n "${HIL_OTA_KEY:-}" ]]; then
+        if [[ ! -f "$HIL_OTA_KEY" ]]; then
+            echo "HIL_OTA_KEY is not a file: $HIL_OTA_KEY" >&2
+            exit 1
+        fi
+        cp "$HIL_OTA_KEY" "$key"
+    elif [[ -n "${OTA_PRIVATE_KEY:-}" ]]; then
+        printf '%s\n' "$OTA_PRIVATE_KEY" | tr -d '\r' >"$key"
+    else
+        echo "Need Gitea secret OTA_PRIVATE_KEY (same PEM as GitHub) or HIL_OTA_KEY (PEM path) to sign the HIL OTA image." >&2
+        exit 1
+    fi
+    assert_ota_key_matches_firmware "$key"
+    sig="$ARTIFACT_DIR/ota/firmware.sig"
+    python3 "$ROOT/scripts/sign_firmware.py" "$ARTIFACT_DIR/ota/firmware.bin" "$key" "$sig"
+    rm -f "$key"
+    n="$(wc -c <"$sig" | tr -d ' ')"
+    if [[ "$n" != "64" ]]; then
+        echo "firmware.sig is $n bytes, want 64" >&2
+        exit 1
+    fi
+}
+
+stage_ota_files() {
+    hil_scp "$ARTIFACT_DIR/ota/firmware.bin" "${SSH_USER}@${SSH_HOST}:/tmp/hil-ota-firmware.bin"
+    hil_scp "$ARTIFACT_DIR/ota/firmware.json" "${SSH_USER}@${SSH_HOST}:/tmp/hil-ota-firmware.json"
+    hil_scp "$ARTIFACT_DIR/ota/firmware.sig" "${SSH_USER}@${SSH_HOST}:/tmp/hil-ota-firmware.sig"
+    if [[ -f "$ARTIFACT_DIR/ota/firmware.bad.json" ]]; then
+        hil_scp "$ARTIFACT_DIR/ota/firmware.bad.json" "${SSH_USER}@${SSH_HOST}:/tmp/hil-ota-firmware.bad.json"
+    fi
+    if [[ -f "$ARTIFACT_DIR/ota/firmware.bad.sig" ]]; then
+        hil_scp "$ARTIFACT_DIR/ota/firmware.bad.sig" "${SSH_USER}@${SSH_HOST}:/tmp/hil-ota-firmware.bad.sig"
+    fi
+}
+
+# json_remote / sig_remote are filenames already on the NAS at /tmp/hil-ota-*.
+# Only docker cp (no scp) so this can run inside the 10s hello OTA window.
+apply_ota_cache() {
+    local json_remote="$1"
+    local sig_remote="${2:-}"
+    local have_sig=0
+    [[ -n "$sig_remote" ]] && have_sig=1
+    hil_ssh "$(docker_path)
+set -e
+HAVE_SIG=$have_sig
+JSON=$json_remote
+SIG=$sig_remote
+docker cp /tmp/hil-ota-firmware.bin $CONTAINER:/data/firmware/firmware.bin
+docker cp /tmp/hil-ota-\$JSON $CONTAINER:/data/firmware/firmware.json
+if [ \$HAVE_SIG = 1 ]; then
+  docker cp /tmp/hil-ota-\$SIG $CONTAINER:/data/firmware/firmware.sig
+else
+  docker exec -u root $CONTAINER rm -f /data/firmware/firmware.sig
+fi"
+}
+
+verify_firmware_http() {
+    local expect_sha="$1"
+    local expect_sig_len="$2"
+    python3 - "$HIL_SERVER" "$expect_sha" "$expect_sig_len" <<'PY'
+import sys, urllib.error, urllib.request
+
+server, expect_sha, expect_sig_len = sys.argv[1].rstrip("/"), sys.argv[2].lower(), int(sys.argv[3])
+fw_url = server + "/api/home_intercom/firmware"
+sig_url = server + "/api/home_intercom/firmware.sig"
+
+req = urllib.request.Request(fw_url, method="HEAD")
+sha = ""
+size = None
+try:
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        headers = {k.lower(): v for k, v in resp.headers.items()}
+        sha = (headers.get("x-checksum-sha256") or "").strip().lower()
+        size = resp.headers.get("Content-Length")
+except urllib.error.HTTPError:
+    sha = ""
+if not sha:
+    with urllib.request.urlopen(fw_url, timeout=60) as resp:
+        headers = {k.lower(): v for k, v in resp.headers.items()}
+        sha = (headers.get("x-checksum-sha256") or "").strip().lower()
+        body = resp.read()
+        size = str(len(body))
+if sha != expect_sha:
+    raise SystemExit(f"X-Checksum-SHA256 {sha!r} != {expect_sha!r}")
+print(f"GET /firmware: {size or '?'} bytes X-Checksum-SHA256={sha}", flush=True)
+
+try:
+    with urllib.request.urlopen(sig_url, timeout=30) as resp:
+        sig_body = resp.read()
+except urllib.error.HTTPError as exc:
+    if expect_sig_len == 0 and exc.code == 404:
+        print("GET /firmware.sig: 404 (expected)", flush=True)
+        raise SystemExit(0)
+    raise SystemExit(f"GET /firmware.sig failed: HTTP {exc.code}") from exc
+if len(sig_body) != expect_sig_len:
+    raise SystemExit(f"firmware.sig is {len(sig_body)} bytes, want {expect_sig_len}")
+print(f"GET /firmware.sig: {len(sig_body)} bytes", flush=True)
+PY
+}
+
+confirm_test() {
+    python3 "$ROOT/scripts/hil_confirm_test.py" --port "$USB" "$@"
+}
+
 FW_BACKUP=""
 HIL_BUTTONS_RESTORE=""
 restore_firmware_cache() {
@@ -374,7 +525,9 @@ if [ -f \$B/firmware.sig ]; then
 else
   docker exec -u root $CONTAINER rm -f /data/firmware/firmware.sig
 fi
-rm -rf \$B" || echo "WARNING: failed to restore firmware cache" >&2
+rm -rf \$B
+rm -f /tmp/hil-ota-firmware.bin /tmp/hil-ota-firmware.json /tmp/hil-ota-firmware.sig \
+      /tmp/hil-ota-firmware.bad.json /tmp/hil-ota-firmware.bad.sig" || echo "WARNING: failed to restore firmware cache" >&2
     FW_BACKUP=""
 }
 
@@ -437,6 +590,10 @@ do_compile() {
     OTA_SHA="$(sha256sum "$ARTIFACT_DIR/ota/firmware.bin" | awk '{print $1}')"
     OTA_SIZE="$(wc -c < "$ARTIFACT_DIR/ota/firmware.bin" | tr -d ' ')"
     echo "OTA bin $OTA_SIZE bytes sha256=$OTA_SHA"
+    if [[ "$SKIP_OTA" != "1" ]]; then
+        echo "=== sign OTA image ==="
+        sign_ota_bin
+    fi
 
     CONSTS_ORIG="$(mktemp)"
     cp src/consts.hpp "$CONSTS_ORIG"
@@ -595,20 +752,27 @@ do_test() {
     echo "=== approve $BOARD_MAC ==="
     echo "$(manage approve)"
 
-    echo "=== stage OTA bin ==="
-    hil_scp \
-        "$ARTIFACT_DIR/ota/firmware.bin" "${SSH_USER}@${SSH_HOST}:/tmp/hil-ota-firmware.bin"
-    python3 - "$OTA_VERSION" "$OTA_SHA" <<'PY' >"$ARTIFACT_DIR/ota/firmware.json"
-import json, sys
-print(json.dumps({
-    "version": sys.argv[1],
-    "sha256": sys.argv[2],
-    "tag": "hil-ota",
-    "asset": "firmware.bin",
-}, indent=2))
+    if [[ ! -f "$ARTIFACT_DIR/ota/firmware.sig" ]]; then
+        echo "Missing $ARTIFACT_DIR/ota/firmware.sig — compile with OTA_PRIVATE_KEY or HIL_OTA_KEY" >&2
+        exit 1
+    fi
+    write_ota_json "$OTA_SHA" "$ARTIFACT_DIR/ota/firmware.json"
+    if [[ "$SKIP_TAMPER" != "1" ]]; then
+        python3 - "$ARTIFACT_DIR/ota/firmware.bad.sig" <<'PY'
+from pathlib import Path
+import sys
+Path(sys.argv[1]).write_bytes(b"\xaa" * 64)
 PY
-    hil_scp \
-        "$ARTIFACT_DIR/ota/firmware.json" "${SSH_USER}@${SSH_HOST}:/tmp/hil-ota-firmware.json"
+        if [[ "${OTA_SHA:0:1}" == "0" ]]; then
+            BAD_SHA="1${OTA_SHA:1}"
+        else
+            BAD_SHA="0${OTA_SHA:1}"
+        fi
+        write_ota_json "$BAD_SHA" "$ARTIFACT_DIR/ota/firmware.bad.json"
+    fi
+
+    echo "=== stage signed OTA files on NAS ==="
+    stage_ota_files
 
     echo "=== backup firmware cache ==="
     FW_BACKUP="/tmp/hil-fw-backup"
@@ -621,7 +785,7 @@ docker cp $CONTAINER:/data/firmware/firmware.json $FW_BACKUP/firmware.json
 docker cp $CONTAINER:/data/firmware/firmware.sig $FW_BACKUP/firmware.sig 2>/dev/null || true"
 
     echo "=== wait hello heartbeat (10s OTA window) ==="
-    python3 "$ROOT/scripts/hil_confirm_test.py" --port "$USB" --mode heartbeat
+    confirm_test --mode heartbeat
 
     plant_failed=0
     echo "=== POST ota (GitHub fetch, then plant branch bin) ==="
@@ -633,25 +797,49 @@ docker cp $CONTAINER:/data/firmware/firmware.sig $FW_BACKUP/firmware.sig 2>/dev/
         exit 1
     fi
 
-    echo "=== plant branch firmware (unsigned) ==="
-    if ! hil_ssh "$(docker_path)
-docker cp /tmp/hil-ota-firmware.bin $CONTAINER:/data/firmware/firmware.bin
-docker cp /tmp/hil-ota-firmware.json $CONTAINER:/data/firmware/firmware.json
-docker exec -u root $CONTAINER rm -f /data/firmware/firmware.sig
-rm -f /tmp/hil-ota-firmware.bin /tmp/hil-ota-firmware.json"; then
-        echo "plant failed — deapprove so the board does not flash GitHub v$OTA_VERSION" >&2
-        manage deapprove >/dev/null || true
-        exit 1
+    plant_or_abort() {
+        if ! apply_ota_cache "$@"; then
+            echo "plant failed — deapprove so the board does not flash GitHub v$OTA_VERSION" >&2
+            manage deapprove >/dev/null || true
+            exit 1
+        fi
+    }
+
+    watch_ota() {
+        local rc=0
+        set +e
+        confirm_test "$@"
+        rc=$?
+        set -e
+        if [[ "$rc" -ne 0 ]]; then
+            echo "LAN OTA watch failed (rc=$rc)" >&2
+            exit "$rc"
+        fi
+    }
+
+    SEND_OTA=()
+    if [[ "$SKIP_TAMPER" != "1" ]]; then
+        echo "=== plant wrong X-Checksum-SHA256 ==="
+        plant_or_abort firmware.bad.json firmware.sig
+        watch_ota --mode ota-fail --expect "SHA-256 mismatch" --timeout 180
+        verify_firmware_http "$BAD_SHA" 64
+
+        echo "=== plant wrong firmware.sig ==="
+        plant_or_abort firmware.json firmware.bad.sig
+        verify_firmware_http "$OTA_SHA" 64
+        watch_ota --mode ota-fail --send-ota --expect "ECDSA signature invalid" --timeout 180
+        SEND_OTA=(--send-ota)
     fi
 
-    echo "=== serial watch LAN OTA ==="
-    set +e
-    python3 "$ROOT/scripts/hil_confirm_test.py" --port "$USB" --mode ota-watch --timeout 180
-    WATCH_RC=$?
-    set -e
-    if [[ "$WATCH_RC" -ne 0 ]]; then
-        echo "LAN OTA watch failed (rc=$WATCH_RC)" >&2
-        exit "$WATCH_RC"
+    echo "=== plant signed branch firmware ==="
+    plant_or_abort firmware.json firmware.sig
+    verify_firmware_http "$OTA_SHA" 64
+
+    echo "=== serial watch signed LAN OTA ==="
+    if ((${#SEND_OTA[@]})); then
+        watch_ota --mode ota-watch --timeout 180 "${SEND_OTA[@]}"
+    else
+        watch_ota --mode ota-watch --timeout 180
     fi
 
     if [[ "$SKIP_BUTTONS" != "1" ]]; then

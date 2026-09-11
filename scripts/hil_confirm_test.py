@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serial smoke tests for OTA confirm (issue #42 / #44)."""
+"""Serial smoke tests for OTA confirm and signed LAN OTA (issues #42 / #44 / #46)."""
 import argparse
 import os
 import select
@@ -30,6 +30,11 @@ NEEDLES_OTA_OK = (
 NEEDLES_OTA_FAIL = (
     "[main] OTA failed",
     "[ota] FAILED",
+)
+
+NEEDLES_SIGNED_OK = (
+    "[ota] SHA-256 verified OK",
+    "[ota] ECDSA signature verified OK",
 )
 
 
@@ -172,8 +177,48 @@ def run_dry_run(fd, buf, skip_nohello):
     print("[hil] PASS: hello dry-run + timeout dry-run", flush=True)
 
 
-def run_ota_watch(fd, port, buf, timeout):
+def send_serial_ota(fd, buf):
+    time.sleep(1)
+    read_more(fd, 0.5, buf)
+    buf.clear()
+    send(fd, "ota")
+    started, _ = wait_for(fd, ["OTA update triggered via serial", "Unknown command"], 15, buf)
+    if started != "OTA update triggered via serial":
+        print(f"\n[hil] serial ota start hit={started!r}", flush=True)
+        sys.exit(6)
+
+
+def require_signed_ok(text):
+    missing = [n for n in NEEDLES_SIGNED_OK if n not in text]
+    if missing:
+        print(f"\nLAN OTA succeeded without {missing} (unsigned plant?)", flush=True)
+        sys.exit(6)
+
+
+def run_ota_fail(fd, buf, timeout, expect, send_ota):
+    print("--- wait LAN OTA reject ---", flush=True)
+    if send_ota:
+        send_serial_ota(fd, buf)
+    hit, text = wait_for(fd, NEEDLES_OTA_FAIL + NEEDLES_OTA_OK, timeout, buf)
+    print(f"\n[hil] ota-fail hit={hit!r}", flush=True)
+    if hit in NEEDLES_OTA_OK:
+        print("expected OTA reject, board flashed anyway", flush=True)
+        sys.exit(6)
+    if hit is None:
+        print("\nTIMEOUT waiting for LAN OTA reject", flush=True)
+        sys.exit(6)
+    if expect and expect not in text:
+        print(f"OTA failed but missing {expect!r}", flush=True)
+        sys.exit(6)
+    # LED blink then IDLE; next serial `ota` needs the command handler.
+    time.sleep(3)
+    print(f"[hil] PASS: tampered OTA rejected ({expect or hit})", flush=True)
+
+
+def run_ota_watch(fd, port, buf, timeout, send_ota):
     print("--- wait LAN OTA ---", flush=True)
+    if send_ota:
+        send_serial_ota(fd, buf)
     hit, text = wait_for(fd, NEEDLES_OTA_FAIL + NEEDLES_OTA_OK, timeout, buf)
     print(f"\n[hil] ota hit={hit!r}", flush=True)
     if hit in NEEDLES_OTA_FAIL:
@@ -181,6 +226,7 @@ def run_ota_watch(fd, port, buf, timeout):
     if hit is None:
         print("\nTIMEOUT waiting for LAN OTA success", flush=True)
         sys.exit(6)
+    require_signed_ok(text)
 
     print("--- reopen serial after OTA reboot ---", flush=True)
     os.close(fd)
@@ -238,14 +284,19 @@ def main():
     parser.add_argument("--skip-nohello", action="store_true")
     parser.add_argument(
         "--mode",
-        choices=("dry-run", "heartbeat", "ota-watch", "buttons"),
+        choices=("dry-run", "heartbeat", "ota-watch", "ota-fail", "buttons"),
         default="dry-run",
     )
     parser.add_argument("--timeout", type=float, default=180)
     parser.add_argument(
+        "--send-ota",
+        action="store_true",
+        help="Send serial `ota` (bypasses hello ota skip after a failed flash)",
+    )
+    parser.add_argument(
         "--expect",
         default="",
-        help="Serial substring required in buttons mode (e.g. 'GPIO4 → study')",
+        help="Required serial substring (buttons map, or ota-fail reason)",
     )
     args = parser.parse_args()
 
@@ -254,8 +305,13 @@ def main():
     buf = []
 
     if args.mode == "ota-watch":
-        run_ota_watch(fd, args.port, buf, args.timeout)
+        run_ota_watch(fd, args.port, buf, args.timeout, args.send_ota)
         return
+
+    if args.mode == "ota-fail":
+        run_ota_fail(fd, buf, args.timeout, args.expect.strip(), args.send_ota)
+        os.close(fd)
+        sys.exit(0)
 
     if args.mode == "buttons":
         expect = args.expect.strip()
