@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-09-11
+
 ### 🚀 Added
 
 - Native tests for `audio_recorder.cpp` and `main.cpp` setup/loop (#8). ESP timer/ADC/heap/`Update`/mbedtls are mocked; `ota_manager.cpp` is the real module.
@@ -15,6 +17,10 @@
 ### 🔧 Changed
 
 - Gitea HIL repo variables name the board and LAN server (`HIL_MAC`, `HIL_SSH_HOST`, `HIL_CONTAINER`, …), not a specific appliance. SSH identity and `docker` path stay on the runner. Required HIL env has no lab defaults in the repo.
+
+### 📖 Documentation
+
+- README (EN/ZH): USB first flash vs GitHub `.bin`/`.sig` vs LAN OTA. The device verifies the signature; it does not sign.
 
 ## [0.3.0] — 2026-09-10
 
