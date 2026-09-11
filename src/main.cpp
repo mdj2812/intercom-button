@@ -40,6 +40,9 @@
 #include "server_config.h"
 #include "wifi_manager.h"
 
+// mbedtls ECDSA verify during signed OTA needs more than the default 8KB.
+SET_LOOP_TASK_STACK_SIZE(24 * 1024);
+
 // ── Globals ─────────────────────────────────────────
 static ButtonManager buttons;
 static RoomTargetStore room_store;

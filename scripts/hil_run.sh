@@ -416,6 +416,15 @@ EOF
     echo "Artifacts: $ARTIFACT_DIR"
 }
 
+# Pending hello does not start OTA (should_start_ota only on status ok).
+# 9C:B8 still had ota_requested from a PWA Update, so the first hello after USB
+# flash began a signed GitHub OTA and confirm_test was ignored (state OTA).
+hold_hello_pending() {
+    BOARD_MAC="$(normalize_mac "$HIL_MAC")"
+    echo "=== deapprove $BOARD_MAC (no hello ota until after confirm_test) ==="
+    echo "$(manage deapprove)"
+}
+
 do_flash() {
     echo "=== flash ($PHASE) ==="
     ensure_image
@@ -425,6 +434,7 @@ do_flash() {
         echo "Incomplete compile artifacts in $ARTIFACT_DIR" >&2
         exit 1
     fi
+    hold_hello_pending
     require_hil_mac
 
     echo "=== flash factory (USB $USB_FW_VERSION) ==="
@@ -451,6 +461,7 @@ do_test() {
     ensure_image
     load_meta
     sync_artifacts_to_workspace
+    hold_hello_pending
     require_hil_mac
 
     if [[ "$SKIP_DRY_RUN" != "1" ]]; then

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### 🐛 Fixed
+
+- **Signed OTA stack overflow** — download used a 4KB stack buffer, then mbedtls ECDSA ran on the default 8KB `loopTask` and paniced (`Stack canary watchpoint triggered`). Chunk buffer is on the heap; loop stack is 24KB.
+- **HIL confirm_test vs leftover `ota`** — deapprove the reserved MAC before USB flash/dry-run so a pending PWA Update cannot start OTA while serial expects idle.
+
 ## [0.3.0] — 2026-09-10
 
 ### ⚠ Breaking

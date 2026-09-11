@@ -17,6 +17,7 @@
 #include <Update.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include <esp_ota_ops.h>
@@ -223,14 +224,26 @@ bool download_and_flash() {
     s_progress.total_bytes = content_length;
     s_progress.state = State::DOWNLOADING;
 
-    uint8_t buf[4096];
+    // Heap, not stack: a 4KB buffer plus mbedtls ECDSA (~8KB) overflows the
+    // default 8KB loopTask (HIL: stack canary during "Verifying ECDSA signature").
+    constexpr size_t kChunk = 4096;
+    uint8_t* buf = static_cast<uint8_t*>(malloc(kChunk));
+    if (!buf) {
+        s_progress.state = State::FAILED;
+        s_progress.error = "OOM download buffer";
+        Serial.println("[ota] FAILED: malloc download buffer");
+        Update.abort();
+        mbedtls_sha256_free(&sha);
+        client.stop();
+        return false;
+    }
     unsigned long downloaded = 0;
     unsigned long last_report_ms = 0;
 
     while (client.connected() && downloaded < (unsigned long) content_length) {
         int avail = client.available();
         if (avail > 0) {
-            int to_read = (avail > (int) sizeof(buf)) ? (int) sizeof(buf) : avail;
+            int to_read = (avail > (int) kChunk) ? (int) kChunk : avail;
             int r = client.read(buf, to_read);
             if (r > 0) {
                 // Hash stream
@@ -254,7 +267,7 @@ bool download_and_flash() {
 
     // Drain any remaining
     while (client.available()) {
-        int r = client.read(buf, (int) sizeof(buf));
+        int r = client.read(buf, (int) kChunk);
         if (r > 0) {
             mbedtls_sha256_update_ret(&sha, buf, r);
             Update.write(buf, r);
@@ -262,6 +275,7 @@ bool download_and_flash() {
             s_progress.bytes_downloaded = downloaded;
         }
     }
+    free(buf);
 
     client.stop();
 
