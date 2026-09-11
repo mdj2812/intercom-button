@@ -2,14 +2,15 @@
 # Hardware-in-the-loop on butler-runner (Gitea `check:host`).
 # Phases: compile | flash | test | all (default).
 # USB-flashes a baseline image, runs confirm_test, then plants the branch
-# firmware on NAS home-intercom and waits for LAN OTA + hello confirm.
+# firmware on the LAN server and waits for LAN OTA + hello confirm.
 #
 # Gitea Actions (`.gitea/workflows/hil.yml`) passes repo variables into these
-# HIL_* env vars. Change the reserved MAC / NAS host there, not in this file.
+# HIL_* env vars. Change the reserved MAC / SSH host there, not in this file.
 # Defaults below are for a local `./scripts/hil_run.sh` on butler.
 # Wifi is never an env var — it stays in HIL_CONFIG (LittleFS json on the runner).
-# SSH uses the runner's default identity (optional HIL_NAS_SSH_KEY for -i).
-# NAS `docker` is not a Gitea variable; override HIL_NAS_DOCKER on the runner.
+# SSH uses the runner's default identity (optional HIL_SSH_KEY for -i).
+# `docker` on the SSH host is not a Gitea variable; set HIL_DOCKER on the runner
+# if it is not on that host's login PATH.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -46,11 +47,9 @@ ESPTOOL=/root/.platformio/packages/tool-esptoolpy/esptool.py
 FIRMWARE_ELF_DIR=".pio/build/esp32-s3-devkitc-1"
 HIL_MAC="${HIL_MAC:-DC:DA:0C:61:9C:B8}"
 HIL_SERVER="${HIL_SERVER:-http://192.168.99.10:8764}"
-NAS_HOST="${HIL_NAS_HOST:-192.168.99.10}"
-NAS_USER="${HIL_NAS_USER:-marmdjtin}"
-# QNAP Container Station is not on a login PATH. Override on the runner if needed.
-HIL_NAS_DOCKER="${HIL_NAS_DOCKER:-/share/CACHEDEV1_DATA/.qpkg/container-station/bin/docker}"
-NAS_CONTAINER="${HIL_NAS_CONTAINER:-home-intercom}"
+SSH_HOST="${HIL_SSH_HOST:-192.168.99.10}"
+SSH_USER="${HIL_SSH_USER:-marmdjtin}"
+CONTAINER="${HIL_CONTAINER:-home-intercom}"
 SKIP_DRY_RUN="${HIL_SKIP_DRY_RUN:-0}"
 SKIP_OTA="${HIL_SKIP_OTA:-0}"
 SKIP_BUTTONS="${HIL_SKIP_BUTTONS:-0}"
@@ -257,26 +256,26 @@ esptool() {
     ./docker/dev.sh python3 "$ESPTOOL" "$@"
 }
 
-nas_ssh() {
+hil_ssh() {
     local -a cmd=(ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new)
-    if [[ -n "${HIL_NAS_SSH_KEY:-}" ]]; then
-        cmd+=(-i "$HIL_NAS_SSH_KEY")
+    if [[ -n "${HIL_SSH_KEY:-}" ]]; then
+        cmd+=(-i "$HIL_SSH_KEY")
     fi
-    "${cmd[@]}" "${NAS_USER}@${NAS_HOST}" "$@"
+    "${cmd[@]}" "${SSH_USER}@${SSH_HOST}" "$@"
 }
 
-nas_scp() {
+hil_scp() {
     local -a cmd=(scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new)
-    if [[ -n "${HIL_NAS_SSH_KEY:-}" ]]; then
-        cmd+=(-i "$HIL_NAS_SSH_KEY")
+    if [[ -n "${HIL_SSH_KEY:-}" ]]; then
+        cmd+=(-i "$HIL_SSH_KEY")
     fi
     "${cmd[@]}" "$@"
 }
 
-# If the runner set an absolute docker path (QNAP Container Station), put it on PATH.
-nas_docker_path() {
-    if [[ "${HIL_NAS_DOCKER:-}" == /* ]]; then
-        printf 'export PATH=%q:"$PATH"\n' "$(dirname "$HIL_NAS_DOCKER")"
+# If the runner set an absolute `docker` path, put that directory on PATH.
+docker_path() {
+    if [[ "${HIL_DOCKER:-}" == /* ]]; then
+        printf 'export PATH=%q:"$PATH"\n' "$(dirname "$HIL_DOCKER")"
     fi
 }
 
@@ -330,25 +329,25 @@ print(json.dumps({"prev": prev, "want": want, "apply": {"4": want}}, separators=
 PY
 }
 
-BACKUP_ON_NAS=""
+FW_BACKUP=""
 HIL_BUTTONS_RESTORE=""
 restore_firmware_cache() {
-    if [[ -z "$BACKUP_ON_NAS" ]]; then
+    if [[ -z "$FW_BACKUP" ]]; then
         return 0
     fi
-    echo "=== restore NAS firmware cache ==="
-    nas_ssh "$(nas_docker_path)
+    echo "=== restore firmware cache ==="
+    hil_ssh "$(docker_path)
 set -e
-B=$BACKUP_ON_NAS
-docker cp \$B/firmware.bin $NAS_CONTAINER:/data/firmware/firmware.bin
-docker cp \$B/firmware.json $NAS_CONTAINER:/data/firmware/firmware.json
+B=$FW_BACKUP
+docker cp \$B/firmware.bin $CONTAINER:/data/firmware/firmware.bin
+docker cp \$B/firmware.json $CONTAINER:/data/firmware/firmware.json
 if [ -f \$B/firmware.sig ]; then
-  docker cp \$B/firmware.sig $NAS_CONTAINER:/data/firmware/firmware.sig
+  docker cp \$B/firmware.sig $CONTAINER:/data/firmware/firmware.sig
 else
-  docker exec -u root $NAS_CONTAINER rm -f /data/firmware/firmware.sig
+  docker exec -u root $CONTAINER rm -f /data/firmware/firmware.sig
 fi
-rm -rf \$B" || echo "WARNING: failed to restore NAS firmware cache" >&2
-    BACKUP_ON_NAS=""
+rm -rf \$B" || echo "WARNING: failed to restore firmware cache" >&2
+    FW_BACKUP=""
 }
 
 restore_hil_buttons() {
@@ -468,7 +467,7 @@ for key, device in devices.items():
         wanted = bool(device.get("ota_requested"))
         break
 if not wanted:
-    print("no leftover ota_requested — skip NAS registry rewrite", flush=True)
+    print("no leftover ota_requested — skip registry rewrite", flush=True)
     raise SystemExit(0)
 print("ota_cancel not on server and ota_requested is set — rewrite registry + restart", flush=True)
 raise SystemExit(2)
@@ -478,11 +477,11 @@ PY
     if [[ "$need_restart" -eq 0 ]]; then
         return 0
     fi
-    echo "=== rewrite device_registry.json and restart $NAS_CONTAINER ==="
-    nas_ssh "$(nas_docker_path)
+    echo "=== rewrite device_registry.json and restart $CONTAINER ==="
+    hil_ssh "$(docker_path)
 set -e
 MAC=$(printf '%q' "$BOARD_MAC")
-docker exec -u root $NAS_CONTAINER python3 -c \"
+docker exec -u root $CONTAINER python3 -c \"
 import json
 from pathlib import Path
 p = Path('/data/device_registry.json')
@@ -497,7 +496,7 @@ devices[key]['ota_target_version'] = ''
 p.write_text(json.dumps(data, indent=2) + chr(10))
 print('cleared ota on', key)
 \"
-docker restart $NAS_CONTAINER"
+docker restart $CONTAINER"
     python3 - "$HIL_SERVER" <<'PY'
 import sys, time, urllib.error, urllib.request
 url = sys.argv[1].rstrip("/") + "/api/home_intercom/devices"
@@ -506,12 +505,12 @@ last = None
 while time.time() < deadline:
     try:
         urllib.request.urlopen(url, timeout=5).read()
-        print("NAS home-intercom is up", flush=True)
+        print("home-intercom is up", flush=True)
         raise SystemExit(0)
     except Exception as exc:
         last = exc
         time.sleep(1)
-print("NAS home-intercom did not come back:", last, file=sys.stderr)
+print("home-intercom did not come back:", last, file=sys.stderr)
 sys.exit(1)
 PY
 }
@@ -568,9 +567,9 @@ do_test() {
     echo "=== approve $BOARD_MAC ==="
     echo "$(manage approve)"
 
-    echo "=== stage OTA bin on NAS ==="
-    nas_scp \
-        "$ARTIFACT_DIR/ota/firmware.bin" "${NAS_USER}@${NAS_HOST}:/tmp/hil-ota-firmware.bin"
+    echo "=== stage OTA bin ==="
+    hil_scp \
+        "$ARTIFACT_DIR/ota/firmware.bin" "${SSH_USER}@${SSH_HOST}:/tmp/hil-ota-firmware.bin"
     python3 - "$OTA_VERSION" "$OTA_SHA" <<'PY' >"$ARTIFACT_DIR/ota/firmware.json"
 import json, sys
 print(json.dumps({
@@ -580,18 +579,18 @@ print(json.dumps({
     "asset": "firmware.bin",
 }, indent=2))
 PY
-    nas_scp \
-        "$ARTIFACT_DIR/ota/firmware.json" "${NAS_USER}@${NAS_HOST}:/tmp/hil-ota-firmware.json"
+    hil_scp \
+        "$ARTIFACT_DIR/ota/firmware.json" "${SSH_USER}@${SSH_HOST}:/tmp/hil-ota-firmware.json"
 
-    echo "=== backup NAS firmware cache ==="
-    BACKUP_ON_NAS="/tmp/hil-fw-backup"
-    nas_ssh "$(nas_docker_path)
+    echo "=== backup firmware cache ==="
+    FW_BACKUP="/tmp/hil-fw-backup"
+    hil_ssh "$(docker_path)
 set -e
-rm -rf $BACKUP_ON_NAS
-mkdir -p $BACKUP_ON_NAS
-docker cp $NAS_CONTAINER:/data/firmware/firmware.bin $BACKUP_ON_NAS/firmware.bin
-docker cp $NAS_CONTAINER:/data/firmware/firmware.json $BACKUP_ON_NAS/firmware.json
-docker cp $NAS_CONTAINER:/data/firmware/firmware.sig $BACKUP_ON_NAS/firmware.sig 2>/dev/null || true"
+rm -rf $FW_BACKUP
+mkdir -p $FW_BACKUP
+docker cp $CONTAINER:/data/firmware/firmware.bin $FW_BACKUP/firmware.bin
+docker cp $CONTAINER:/data/firmware/firmware.json $FW_BACKUP/firmware.json
+docker cp $CONTAINER:/data/firmware/firmware.sig $FW_BACKUP/firmware.sig 2>/dev/null || true"
 
     echo "=== wait hello heartbeat (10s OTA window) ==="
     python3 "$ROOT/scripts/hil_confirm_test.py" --port "$USB" --mode heartbeat
@@ -607,10 +606,10 @@ docker cp $NAS_CONTAINER:/data/firmware/firmware.sig $BACKUP_ON_NAS/firmware.sig
     fi
 
     echo "=== plant branch firmware (unsigned) ==="
-    if ! nas_ssh "$(nas_docker_path)
-docker cp /tmp/hil-ota-firmware.bin $NAS_CONTAINER:/data/firmware/firmware.bin
-docker cp /tmp/hil-ota-firmware.json $NAS_CONTAINER:/data/firmware/firmware.json
-docker exec -u root $NAS_CONTAINER rm -f /data/firmware/firmware.sig
+    if ! hil_ssh "$(docker_path)
+docker cp /tmp/hil-ota-firmware.bin $CONTAINER:/data/firmware/firmware.bin
+docker cp /tmp/hil-ota-firmware.json $CONTAINER:/data/firmware/firmware.json
+docker exec -u root $CONTAINER rm -f /data/firmware/firmware.sig
 rm -f /tmp/hil-ota-firmware.bin /tmp/hil-ota-firmware.json"; then
         echo "plant failed — deapprove so the board does not flash GitHub v$OTA_VERSION" >&2
         manage deapprove >/dev/null || true
