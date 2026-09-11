@@ -198,6 +198,8 @@ intercom-button/
 │   └── config.json          # 你的设置（gitignore，上传到 LittleFS）
 ├── test/
 │   ├── mocks/               # 模拟 Arduino/ESP 头文件
+│   ├── test_audio_recorder/ # 定时器 ISR / ADC / PSRAM 录音测试
+│   ├── test_firmware_main/  # setup()/loop() 状态机（宿主 mocks）
 │   ├── test_config_manager/ # 配置解析测试
 │   ├── test_http_uploader/  # HTTP 上传测试
 │   ├── test_device_id/      # MAC 身份测试
@@ -230,7 +232,7 @@ intercom-button/
 | `esp32-s3-devkitc-1` | xtensa-esp32s3 | 固件——编译、烧录、监视 |
 | `native` | x86_64 Linux | 单元测试——宿主机运行，无需 ESP32 |
 
-不加 `-e` 时 `pio run` 会编译**两个**环境。原生环境设置了 `src_filter = -<src/*>`，只编译测试文件——绝不编译依赖 Arduino 的源码。
+不加 `-e` 时 `pio run` 会编译**两个**环境。原生测试会编译 `src/`，但不包括 `main.cpp`（该文件被 `test_firmware_main` 引入，以便 Unity 调用 `setup()`/`loop()`）。
 
 ```bash
 # ✅ 正确

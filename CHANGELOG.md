@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### 🚀 Added
+
+- Native tests for `audio_recorder.cpp` and `main.cpp` setup/loop (#8). ESP timer/ADC/heap/`Update`/mbedtls are mocked; `ota_manager.cpp` is the real module.
+
 ### 🐛 Fixed
 
 - **Signed OTA stack overflow** — download used a 4KB stack buffer, then mbedtls ECDSA ran on the default 8KB `loopTask` and paniced (`Stack canary watchpoint triggered`). Chunk buffer is on the heap; loop stack is 24KB.

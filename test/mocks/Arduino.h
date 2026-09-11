@@ -6,6 +6,15 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <string>
+
+#ifndef IRAM_ATTR
+#define IRAM_ATTR
+#endif
+
+#ifndef SET_LOOP_TASK_STACK_SIZE
+#define SET_LOOP_TASK_STACK_SIZE(bytes) static_assert(true, "native")
+#endif
 
 // ── Pin I/O ─────────────────────────────────────────
 #define INPUT 0x01
@@ -67,13 +76,103 @@ inline void mock_advance_millis(unsigned long ms) {
 
 // ── Serial mock ─────────────────────────────────────
 class SerialMock : public Stream {
+    std::string _rx;
+
 public:
     void begin(unsigned long baud) {
         (void) baud;
     }
     using Print::printf;
+
+    int available() override {
+        return static_cast<int>(_rx.size());
+    }
+
+    void mock_push(const char* s) {
+        if (s)
+            _rx += s;
+    }
+
+    void mock_clear_rx() {
+        _rx.clear();
+    }
+
+    String readStringUntil(char terminator) {
+        auto pos = _rx.find(terminator);
+        String out;
+        if (pos == std::string::npos) {
+            out = String(_rx);
+            _rx.clear();
+        } else {
+            out = String(_rx.substr(0, pos));
+            _rx.erase(0, pos + 1);
+        }
+        return out;
+    }
 };
 inline SerialMock Serial;
+
+// ── Hardware timer (Arduino-ESP32 v2 API) ───────────
+struct hw_timer_t {
+    void (*isr)() = nullptr;
+    bool alarm_enabled = false;
+};
+
+inline hw_timer_t _mock_hw_timer;
+inline bool _mock_timer_begin_fail = false;
+
+inline void mock_timer_reset() {
+    _mock_hw_timer = hw_timer_t{};
+    _mock_timer_begin_fail = false;
+}
+
+inline hw_timer_t* timerBegin(uint8_t, uint16_t, bool) {
+    if (_mock_timer_begin_fail)
+        return nullptr;
+    _mock_hw_timer = hw_timer_t{};
+    return &_mock_hw_timer;
+}
+
+inline void timerEnd(hw_timer_t* timer) {
+    if (timer)
+        *timer = hw_timer_t{};
+}
+
+inline void timerAttachInterrupt(hw_timer_t* timer, void (*fn)(), bool) {
+    if (timer)
+        timer->isr = fn;
+}
+
+inline void timerAlarmWrite(hw_timer_t*, uint64_t, bool) {}
+
+inline void timerAlarmEnable(hw_timer_t* timer) {
+    if (timer)
+        timer->alarm_enabled = true;
+}
+
+inline void timerAlarmDisable(hw_timer_t* timer) {
+    if (timer)
+        timer->alarm_enabled = false;
+}
+
+inline void mock_timer_isr() {
+    if (_mock_hw_timer.isr && _mock_hw_timer.alarm_enabled)
+        _mock_hw_timer.isr();
+}
+
+// ── ESP.restart ─────────────────────────────────────
+inline int _mock_esp_restart_count = 0;
+
+struct EspClass {
+    void restart() {
+        _mock_esp_restart_count++;
+    }
+};
+inline EspClass ESP;
+
+inline void mock_esp_reset() {
+    _mock_esp_restart_count = 0;
+}
 
 // ── printf implementation ───────────────────────────
 inline int Print::printf(const char* fmt, ...) {

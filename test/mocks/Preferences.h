@@ -1,5 +1,6 @@
 #pragma once
 #include "WString.h"
+#include <cstdint>
 #include <cstring>
 #include <map>
 #include <string>
@@ -43,6 +44,40 @@ public:
             return 0;
         _stores[_ns][key] = value;
         return strlen(value);
+    }
+
+    bool putBool(const char* key, bool value) {
+        if (_readOnly)
+            return false;
+        _stores[_ns][key] = value ? "1" : "0";
+        return true;
+    }
+
+    bool getBool(const char* key, bool defaultValue = false) const {
+        auto ns_it = _stores.find(_ns);
+        if (ns_it == _stores.end())
+            return defaultValue;
+        auto kv_it = ns_it->second.find(key);
+        if (kv_it == ns_it->second.end())
+            return defaultValue;
+        return kv_it->second == "1" || kv_it->second == "true";
+    }
+
+    size_t putUInt(const char* key, uint32_t value) {
+        if (_readOnly)
+            return 0;
+        _stores[_ns][key] = std::to_string(value);
+        return 1;
+    }
+
+    uint32_t getUInt(const char* key, uint32_t defaultValue = 0) const {
+        auto ns_it = _stores.find(_ns);
+        if (ns_it == _stores.end())
+            return defaultValue;
+        auto kv_it = ns_it->second.find(key);
+        if (kv_it == ns_it->second.end())
+            return defaultValue;
+        return static_cast<uint32_t>(std::stoul(kv_it->second));
     }
 
     bool clear() {

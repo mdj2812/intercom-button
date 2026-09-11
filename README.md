@@ -199,6 +199,8 @@ intercom-button/
 │   └── config.json          # Your settings (gitignored, uploaded to LittleFS)
 ├── test/
 │   ├── mocks/               # Mock Arduino/ESP headers
+│   ├── test_audio_recorder/ # Timer ISR / ADC / PSRAM audio tests
+│   ├── test_firmware_main/  # setup()/loop() state machine (native mocks)
 │   ├── test_config/         # Config parsing tests
 │   ├── test_config_manager/ # Config manager tests
 │   ├── test_http_uploader/  # HTTP upload tests
@@ -233,7 +235,7 @@ This project has **two PlatformIO environments** — always specify which one to
 | `esp32-s3-devkitc-1` | xtensa-esp32s3 | Firmware — compile, flash, monitor |
 | `native` | x86_64 Linux | Unit tests — run on host, no ESP32 needed |
 
-Without `-e`, `pio run` builds **both** environments. The native env has `src_filter = -<src/*>` so it only compiles test files — never Arduino-dependent source code.
+Without `-e`, `pio run` builds **both** environments. Native tests compile `src/` except `main.cpp` (that file is pulled into `test_firmware_main` so Unity can call `setup()`/`loop()`).
 
 ```bash
 # ✅ Correct
