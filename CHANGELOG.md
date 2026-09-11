@@ -5,6 +5,7 @@
 ### 🚀 Added
 
 - Native tests for `audio_recorder.cpp` and `main.cpp` setup/loop (#8). ESP timer/ADC/heap/`Update`/mbedtls are mocked; `ota_manager.cpp` is the real module.
+- HIL signed OTA (#46): plant a branch `.bin` with a 64-byte ECDSA `.sig` and matching `X-Checksum-SHA256`; a wrong checksum and wrong `.sig` must fail on hardware before the good image hello-confirms.
 
 ### 🐛 Fixed
 

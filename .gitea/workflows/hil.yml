@@ -12,6 +12,8 @@
 # Scripts have no lab defaults; empty required vars fail the job.
 # Wifi stays in /opt/intercom-button/hil-config.json on the runner (not a variable).
 # SSH identity and `docker` binary path are runner defaults, not repo variables.
+# Signed OTA (#46): secret OTA_PRIVATE_KEY (same PEM as GitHub) or variable HIL_OTA_KEY
+# (path to that PEM on the runner). Compile fails if neither is set.
 name: HIL
 
 on:
@@ -24,6 +26,7 @@ on:
       - 'partitions_ota_8MB.csv'
       - 'scripts/hil_run.sh'
       - 'scripts/hil_confirm_test.py'
+      - 'scripts/sign_firmware.py'
       - 'docker/dev.sh'
       - 'docker/Dockerfile'
       - 'docker/.docker-image'
@@ -41,6 +44,8 @@ env:
   HIL_LOCK: ${{ vars.HIL_LOCK }}
   HIL_USB_VERSION: ${{ vars.HIL_USB_VERSION }}
   HIL_LITTLEFS_OFFSET: ${{ vars.HIL_LITTLEFS_OFFSET }}
+  HIL_OTA_KEY: ${{ vars.HIL_OTA_KEY }}
+  OTA_PRIVATE_KEY: ${{ secrets.OTA_PRIVATE_KEY }}
 
 jobs:
   compile:
@@ -70,10 +75,10 @@ jobs:
     name: Test
     needs: flash
     runs-on: check
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: Serial dry-run, LAN OTA, hello buttons
+      - name: Serial dry-run, signed LAN OTA, hello buttons
         run: |
           chmod +x scripts/hil_run.sh scripts/hil_confirm_test.py
           ./scripts/hil_run.sh test
