@@ -11,6 +11,7 @@
 # Host-specific values: Gitea repo Actions variables (Settings → Actions → Variables).
 # Empty vars fall back to scripts/hil_run.sh defaults (local butler runs).
 # Wifi stays in /opt/intercom-button/hil-config.json on the runner (not a variable).
+# SSH key and NAS docker binary are runner/host PATH defaults, not repo variables.
 name: HIL
 
 on:
@@ -34,8 +35,6 @@ env:
   HIL_SERVER: ${{ vars.HIL_SERVER }}
   HIL_NAS_HOST: ${{ vars.HIL_NAS_HOST }}
   HIL_NAS_USER: ${{ vars.HIL_NAS_USER }}
-  HIL_NAS_SSH_KEY: ${{ vars.HIL_NAS_SSH_KEY }}
-  HIL_NAS_DOCKER: ${{ vars.HIL_NAS_DOCKER }}
   HIL_NAS_CONTAINER: ${{ vars.HIL_NAS_CONTAINER }}
   HIL_LAN_IMAGE: ${{ vars.HIL_LAN_IMAGE }}
   HIL_CONFIG: ${{ vars.HIL_CONFIG }}

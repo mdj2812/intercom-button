@@ -8,6 +8,8 @@
 # HIL_* env vars. Change the reserved MAC / NAS host there, not in this file.
 # Defaults below are for a local `./scripts/hil_run.sh` on butler.
 # Wifi is never an env var — it stays in HIL_CONFIG (LittleFS json on the runner).
+# SSH uses the runner's default identity (optional HIL_NAS_SSH_KEY for -i).
+# NAS `docker` is not a Gitea variable; override HIL_NAS_DOCKER on the runner.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -46,8 +48,8 @@ HIL_MAC="${HIL_MAC:-DC:DA:0C:61:9C:B8}"
 HIL_SERVER="${HIL_SERVER:-http://192.168.99.10:8764}"
 NAS_HOST="${HIL_NAS_HOST:-192.168.99.10}"
 NAS_USER="${HIL_NAS_USER:-marmdjtin}"
-NAS_KEY="${HIL_NAS_SSH_KEY:-/root/.ssh/id_rsa}"
-NAS_DOCKER="${HIL_NAS_DOCKER:-/share/CACHEDEV1_DATA/.qpkg/container-station/bin/docker}"
+# QNAP Container Station is not on a login PATH. Override on the runner if needed.
+HIL_NAS_DOCKER="${HIL_NAS_DOCKER:-/share/CACHEDEV1_DATA/.qpkg/container-station/bin/docker}"
 NAS_CONTAINER="${HIL_NAS_CONTAINER:-home-intercom}"
 SKIP_DRY_RUN="${HIL_SKIP_DRY_RUN:-0}"
 SKIP_OTA="${HIL_SKIP_OTA:-0}"
@@ -256,9 +258,26 @@ esptool() {
 }
 
 nas_ssh() {
-    ssh -i "$NAS_KEY" -o BatchMode=yes -o ConnectTimeout=8 \
-        -o StrictHostKeyChecking=accept-new \
-        "${NAS_USER}@${NAS_HOST}" "$@"
+    local -a cmd=(ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new)
+    if [[ -n "${HIL_NAS_SSH_KEY:-}" ]]; then
+        cmd+=(-i "$HIL_NAS_SSH_KEY")
+    fi
+    "${cmd[@]}" "${NAS_USER}@${NAS_HOST}" "$@"
+}
+
+nas_scp() {
+    local -a cmd=(scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new)
+    if [[ -n "${HIL_NAS_SSH_KEY:-}" ]]; then
+        cmd+=(-i "$HIL_NAS_SSH_KEY")
+    fi
+    "${cmd[@]}" "$@"
+}
+
+# If the runner set an absolute docker path (QNAP Container Station), put it on PATH.
+nas_docker_path() {
+    if [[ "${HIL_NAS_DOCKER:-}" == /* ]]; then
+        printf 'export PATH=%q:"$PATH"\n' "$(dirname "$HIL_NAS_DOCKER")"
+    fi
 }
 
 manage() {
@@ -318,7 +337,7 @@ restore_firmware_cache() {
         return 0
     fi
     echo "=== restore NAS firmware cache ==="
-    nas_ssh "export PATH=$(dirname "$NAS_DOCKER"):\$PATH
+    nas_ssh "$(nas_docker_path)
 set -e
 B=$BACKUP_ON_NAS
 docker cp \$B/firmware.bin $NAS_CONTAINER:/data/firmware/firmware.bin
@@ -460,7 +479,7 @@ PY
         return 0
     fi
     echo "=== rewrite device_registry.json and restart $NAS_CONTAINER ==="
-    nas_ssh "export PATH=$(dirname "$NAS_DOCKER"):\$PATH
+    nas_ssh "$(nas_docker_path)
 set -e
 MAC=$(printf '%q' "$BOARD_MAC")
 docker exec -u root $NAS_CONTAINER python3 -c \"
@@ -550,7 +569,7 @@ do_test() {
     echo "$(manage approve)"
 
     echo "=== stage OTA bin on NAS ==="
-    scp -i "$NAS_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+    nas_scp \
         "$ARTIFACT_DIR/ota/firmware.bin" "${NAS_USER}@${NAS_HOST}:/tmp/hil-ota-firmware.bin"
     python3 - "$OTA_VERSION" "$OTA_SHA" <<'PY' >"$ARTIFACT_DIR/ota/firmware.json"
 import json, sys
@@ -561,12 +580,12 @@ print(json.dumps({
     "asset": "firmware.bin",
 }, indent=2))
 PY
-    scp -i "$NAS_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+    nas_scp \
         "$ARTIFACT_DIR/ota/firmware.json" "${NAS_USER}@${NAS_HOST}:/tmp/hil-ota-firmware.json"
 
     echo "=== backup NAS firmware cache ==="
     BACKUP_ON_NAS="/tmp/hil-fw-backup"
-    nas_ssh "export PATH=$(dirname "$NAS_DOCKER"):\$PATH
+    nas_ssh "$(nas_docker_path)
 set -e
 rm -rf $BACKUP_ON_NAS
 mkdir -p $BACKUP_ON_NAS
@@ -588,7 +607,7 @@ docker cp $NAS_CONTAINER:/data/firmware/firmware.sig $BACKUP_ON_NAS/firmware.sig
     fi
 
     echo "=== plant branch firmware (unsigned) ==="
-    if ! nas_ssh "export PATH=$(dirname "$NAS_DOCKER"):\$PATH
+    if ! nas_ssh "$(nas_docker_path)
 docker cp /tmp/hil-ota-firmware.bin $NAS_CONTAINER:/data/firmware/firmware.bin
 docker cp /tmp/hil-ota-firmware.json $NAS_CONTAINER:/data/firmware/firmware.json
 docker exec -u root $NAS_CONTAINER rm -f /data/firmware/firmware.sig
