@@ -23,7 +23,9 @@ static void IRAM_ATTR isr_trampoline() {
     }
 
     int raw = adc1_get_raw((adc1_channel_t) PIN_ADC_CHANNEL);
-    rec->_buffer[rec->_write_idx++] = (int16_t) ((raw - 2048) << 4);
+    uint32_t idx = rec->_write_idx;
+    rec->_buffer[idx] = (int16_t) ((raw - 2048) << 4);
+    rec->_write_idx = idx + 1;
 }
 
 // ── Constructor / Destructor ────────────────────────

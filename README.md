@@ -199,6 +199,8 @@ intercom-button/
 │   └── config.json          # Your settings (gitignored, uploaded to LittleFS)
 ├── test/
 │   ├── mocks/               # Mock Arduino/ESP headers
+│   ├── test_audio_recorder/ # Timer ISR / ADC / PSRAM audio tests
+│   ├── test_firmware_main/  # setup()/loop() state machine (native mocks)
 │   ├── test_config/         # Config parsing tests
 │   ├── test_config_manager/ # Config manager tests
 │   ├── test_http_uploader/  # HTTP upload tests
@@ -233,7 +235,7 @@ This project has **two PlatformIO environments** — always specify which one to
 | `esp32-s3-devkitc-1` | xtensa-esp32s3 | Firmware — compile, flash, monitor |
 | `native` | x86_64 Linux | Unit tests — run on host, no ESP32 needed |
 
-Without `-e`, `pio run` builds **both** environments. The native env has `src_filter = -<src/*>` so it only compiles test files — never Arduino-dependent source code.
+Without `-e`, `pio run` builds **both** environments. Native tests compile `src/` except `main.cpp` (that file is pulled into `test_firmware_main` so Unity can call `setup()`/`loop()`).
 
 ```bash
 # ✅ Correct
@@ -262,7 +264,10 @@ C++ code follows [`.clang-format`](.clang-format) (LLVM-based, 4-space indent, 1
 ```bash
 make format        # auto-format all source files
 make format-check  # check formatting without modifying (CI)
+make compiledb     # compile_commands.json for clangd (uses the dev Docker image)
 ```
+
+Clangd on the host cannot see `/root/.platformio` inside Docker. `make compiledb` copies the firmware packages into `.clangd-pio`, generates `compile_commands.json`, and rewrites paths. Install the **clangd** editor extension (`llvm-vs-code-extensions.vscode-clangd`), disable Microsoft C/C++ IntelliSense, then reload the window. Re-run `make compiledb` after `platformio.ini` or image changes.
 
 CI enforces formatting — PRs with style violations will fail the `format` job.
 

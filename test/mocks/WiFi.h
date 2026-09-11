@@ -14,7 +14,31 @@
 #define WIFI_STA 1
 #define WIFI_AP  2
 
-class WiFiClient {};
+class WiFiClient : public Print {
+public:
+    bool connect(const char*, uint16_t) {
+        return false;
+    }
+    void stop() {}
+    void setTimeout(uint32_t) {}
+    bool connected() {
+        return false;
+    }
+    int available() {
+        return 0;
+    }
+    int read() {
+        return -1;
+    }
+    int read(uint8_t*, size_t) {
+        return 0;
+    }
+    String readStringUntil(char) {
+        return String();
+    }
+    using Print::printf;
+    using Print::print;
+};
 
 // ── Mockable WiFi state ─────────────────────────────
 struct WiFiState {

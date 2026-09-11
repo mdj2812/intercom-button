@@ -1,0 +1,27 @@
+CompileFlags:
+  CompilationDatabase: .
+  Remove:
+    - -mlongcalls
+    - -mtext-section-literals
+    - -fstrict-volatile-bitfields
+    - -fno-tree-switch-conversion
+    - -fipa-pta
+    - -free
+    - -fno-shrink-wrap
+    - -mfix-esp32-psram-cache-issue
+    - -mfix-esp32-psram-cache-strategy=*
+    - --param=*
+  Add:
+    - -Wno-unknown-warning-option
+
+# Native tests use host mocks, not the ESP32 compile_commands entry.
+If:
+  PathMatch: .*/test/.*
+  CompileFlags:
+    Add:
+      - -std=c++20
+      - -DUNIT_TEST
+      - -DARDUINOJSON_ENABLE_ARDUINO_STRING
+      - -Itest/mocks
+      - -I.pio/libdeps/native/ArduinoJson/src
+      - -I.pio/libdeps/native/Unity/src

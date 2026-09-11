@@ -1,6 +1,11 @@
 # ── PlatformIO build artifacts ─────────────────────
 .pio/
 .hil/
+.cache/
+
+# clangd (machine-local paths and a copy of image PIO packages; `make compiledb`)
+compile_commands.json
+.clangd-pio/
 
 # ── Device-specific runtime config ──────────────────
 data/config.json
@@ -13,7 +18,9 @@ coverage_filtered.info
 *.gcno
 
 # ── IDE / Editor ───────────────────────────────────
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo

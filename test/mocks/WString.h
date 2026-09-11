@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <cctype>
 #include <string>
 
@@ -22,6 +23,10 @@ public:
     }
     int indexOf(const char* needle) const {
         auto pos = _s.find(needle);
+        return (pos == std::string::npos) ? -1 : static_cast<int>(pos);
+    }
+    int indexOf(char c) const {
+        auto pos = _s.find(c);
         return (pos == std::string::npos) ? -1 : static_cast<int>(pos);
     }
     bool operator==(const String& o) const {
@@ -51,6 +56,10 @@ public:
         _s += o._s;
         return *this;
     }
+    String& operator+=(const char* s) {
+        _s += s ? s : "";
+        return *this;
+    }
 
     bool concat(const char* s) {
         if (!s)
@@ -69,5 +78,52 @@ public:
     bool concat(unsigned int n) {
         _s += std::to_string(n);
         return true;
+    }
+
+    void trim() {
+        auto not_space = [](unsigned char c) { return !std::isspace(c); };
+        while (!_s.empty() && !not_space(static_cast<unsigned char>(_s.front())))
+            _s.erase(_s.begin());
+        while (!_s.empty() && !not_space(static_cast<unsigned char>(_s.back())))
+            _s.pop_back();
+    }
+
+    bool startsWith(const char* prefix) const {
+        if (!prefix)
+            return false;
+        return _s.rfind(prefix, 0) == 0;
+    }
+
+    String substring(unsigned int from) const {
+        if (from >= _s.size())
+            return String("");
+        return String(_s.substr(from));
+    }
+    String substring(unsigned int from, unsigned int to) const {
+        if (from >= _s.size() || to <= from)
+            return String("");
+        return String(_s.substr(from, to - from));
+    }
+
+    int toInt() const {
+        return std::atoi(_s.c_str());
+    }
+
+    String operator+(const String& o) const {
+        String r(*this);
+        r += o;
+        return r;
+    }
+    String operator+(const char* o) const {
+        String r(*this);
+        r += o;
+        return r;
+    }
+
+    bool operator==(const char* o) const {
+        return _s == (o ? o : "");
+    }
+    bool operator!=(const char* o) const {
+        return !(*this == o);
     }
 };

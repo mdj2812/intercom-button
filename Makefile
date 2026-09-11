@@ -23,7 +23,7 @@ ENV      := esp32-s3-devkitc-1
 PIO      := pio
 
 .PHONY: all build flash flashfs monitor test check clean size format format-check \
-        docker-build docker-flash docker-flashfs docker-test docker-check docker-monitor docker-shell
+        compiledb docker-build docker-flash docker-flashfs docker-test docker-check docker-monitor docker-shell
 
 # ── 裸机命令 ────────────────────────────────────────
 
@@ -78,6 +78,10 @@ format:
 
 format-check:
 	clang-format --dry-run -Werror src/*.cpp src/*.h $$(find test -name '*.cpp')
+
+# Host clangd: copy image PIO packages + generate compile_commands.json
+compiledb:
+	./scripts/clangd_compiledb.sh
 
 # ── Docker 命令（通过 dev.sh，自动处理镜像拉取和 USB 设备挂载）─
 
