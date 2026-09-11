@@ -5,12 +5,10 @@
 # firmware on the LAN server and waits for LAN OTA + hello confirm.
 #
 # Gitea Actions (`.gitea/workflows/hil.yml`) passes repo variables into these
-# HIL_* env vars. Change the reserved MAC / SSH host there, not in this file.
-# Defaults below are for a local `./scripts/hil_run.sh` on butler.
-# Wifi is never an env var — it stays in HIL_CONFIG (LittleFS json on the runner).
+# HIL_* env vars. There are no lab defaults in this file — unset required
+# vars fail the job. Wifi stays in HIL_CONFIG on the runner (not a variable).
 # SSH uses the runner's default identity (optional HIL_SSH_KEY for -i).
-# `docker` on the SSH host is not a Gitea variable; set HIL_DOCKER on the runner
-# if it is not on that host's login PATH.
+# `docker` on the SSH host: set HIL_DOCKER on the runner if it is not on PATH.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -42,19 +40,45 @@ esac
 
 LOCK="${HIL_LOCK:-/var/lock/intercom-button-hil.lock}"
 CONFIG="${HIL_CONFIG:-/opt/intercom-button/hil-config.json}"
-LAN_IMAGE="${HIL_LAN_IMAGE:-registry.home.mdj2812.top/intercom-button-dev:latest}"
+LAN_IMAGE="${HIL_LAN_IMAGE:-}"
 ESPTOOL=/root/.platformio/packages/tool-esptoolpy/esptool.py
 FIRMWARE_ELF_DIR=".pio/build/esp32-s3-devkitc-1"
-HIL_MAC="${HIL_MAC:-DC:DA:0C:61:9C:B8}"
-HIL_SERVER="${HIL_SERVER:-http://192.168.99.10:8764}"
-SSH_HOST="${HIL_SSH_HOST:-192.168.99.10}"
-SSH_USER="${HIL_SSH_USER:-marmdjtin}"
-CONTAINER="${HIL_CONTAINER:-home-intercom}"
+HIL_MAC="${HIL_MAC:-}"
+HIL_SERVER="${HIL_SERVER:-}"
+HIL_SSH_HOST="${HIL_SSH_HOST:-}"
+HIL_SSH_USER="${HIL_SSH_USER:-}"
+HIL_CONTAINER="${HIL_CONTAINER:-}"
 SKIP_DRY_RUN="${HIL_SKIP_DRY_RUN:-0}"
 SKIP_OTA="${HIL_SKIP_OTA:-0}"
 SKIP_BUTTONS="${HIL_SKIP_BUTTONS:-0}"
 USB_FW_VERSION="${HIL_USB_VERSION:-0.2.0}"
 LITTLEFS_OFFSET="${HIL_LITTLEFS_OFFSET:-0x610000}"
+
+if [[ -z "$LAN_IMAGE" && -f "$ROOT/docker/.docker-image" ]]; then
+    LAN_IMAGE="$(head -1 "$ROOT/docker/.docker-image" | tr -d '\n\r')"
+fi
+
+require_vars() {
+    local missing=() n
+    for n in "$@"; do
+        if [[ -z "${!n:-}" ]]; then
+            missing+=("$n")
+        fi
+    done
+    if ((${#missing[@]})); then
+        echo "Missing required HIL env: ${missing[*]}" >&2
+        echo "Set them as Gitea Actions variables (or export them for a local run)." >&2
+        exit 1
+    fi
+}
+
+case "$PHASE" in
+    flash) require_vars HIL_MAC ;;
+    test | all) require_vars HIL_MAC HIL_SERVER HIL_SSH_HOST HIL_SSH_USER HIL_CONTAINER ;;
+esac
+SSH_HOST="$HIL_SSH_HOST"
+SSH_USER="$HIL_SSH_USER"
+CONTAINER="$HIL_CONTAINER"
 
 if [[ -n "${HIL_ARTIFACT_DIR:-}" ]]; then
     ARTIFACT_DIR="$HIL_ARTIFACT_DIR"
@@ -111,7 +135,11 @@ fi
 ensure_image() {
     if ! docker image inspect intercom-button-dev:latest >/dev/null 2>&1 &&
         ! docker image inspect ghcr.io/mdj2812/intercom-button-dev:latest >/dev/null 2>&1; then
-        echo "Pulling $LAN_IMAGE (avoid ghcr)"
+        if [[ -z "$LAN_IMAGE" ]]; then
+            echo "Set HIL_LAN_IMAGE (or docker/.docker-image) to pull a build image." >&2
+            exit 1
+        fi
+        echo "Pulling $LAN_IMAGE"
         docker pull "$LAN_IMAGE"
         docker tag "$LAN_IMAGE" intercom-button-dev:latest
         docker tag "$LAN_IMAGE" ghcr.io/mdj2812/intercom-button-dev:latest

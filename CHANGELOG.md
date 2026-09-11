@@ -9,7 +9,7 @@
 
 ### 🔧 Changed
 
-- Gitea HIL repo variables name the board and LAN server (`HIL_MAC`, `HIL_SSH_HOST`, `HIL_CONTAINER`, …), not a specific appliance. SSH identity and `docker` path stay on the runner.
+- Gitea HIL repo variables name the board and LAN server (`HIL_MAC`, `HIL_SSH_HOST`, `HIL_CONTAINER`, …), not a specific appliance. SSH identity and `docker` path stay on the runner. Required HIL env has no lab defaults in the repo.
 
 ## [0.3.0] — 2026-09-10
 

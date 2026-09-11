@@ -38,7 +38,7 @@ The same firmware binary works for all rooms — just upload a different config 
     "wifi_ssid": "your_wifi",
     "wifi_password": "your_password",
     "server_scheme": "http",
-    "server_host": "192.168.99.4",
+    "server_host": "homeassistant.local",
     "server_port": 8123,
     "pins": [4, 5, 12, 13]
 }

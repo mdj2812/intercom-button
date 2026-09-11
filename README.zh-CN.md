@@ -37,7 +37,7 @@ MAX9814 增益：将 GAIN 焊盘接地获得 50dB（桌面使用推荐）。
     "wifi_ssid": "你的WiFi",
     "wifi_password": "你的密码",
     "server_scheme": "http",
-    "server_host": "192.168.99.4",
+    "server_host": "homeassistant.local",
     "server_port": 8123,
     "pins": [4, 5, 12, 13]
 }

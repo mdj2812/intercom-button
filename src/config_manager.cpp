@@ -24,7 +24,7 @@ struct Config {
     String wifi_ssid = "your_wifi_ssid";
     String wifi_password = "your_wifi_password";
     String server_scheme = "http";
-    String server_host = "192.168.99.4";
+    String server_host = "homeassistant.local";
     uint16_t server_port = 8123;
 
     // Hardware pins from "pins"

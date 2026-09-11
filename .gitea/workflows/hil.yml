@@ -9,7 +9,7 @@
 #   /var/tmp/intercom-button-hil/<run_id>
 #
 # Host-specific values: Gitea repo Actions variables (Settings → Actions → Variables).
-# Empty vars fall back to scripts/hil_run.sh defaults (local butler runs).
+# Scripts have no lab defaults; empty required vars fail the job.
 # Wifi stays in /opt/intercom-button/hil-config.json on the runner (not a variable).
 # SSH identity and `docker` binary path are runner defaults, not repo variables.
 name: HIL
