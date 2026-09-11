@@ -8,9 +8,9 @@
 # so they are not uploaded as Actions artifacts):
 #   /var/tmp/intercom-button-hil/<run_id>
 #
-# Host setup (once): /opt/intercom-button/hil-config.json  (see data/config.example.json)
-# NAS home-intercom (LAN OTA): SSH as marmdjtin with butler /root/.ssh/id_rsa,
-# plant via Container Station docker exec into home-intercom /data/firmware.
+# Host-specific values: Gitea repo Actions variables (Settings → Actions → Variables).
+# Empty vars fall back to scripts/hil_run.sh defaults (local butler runs).
+# Wifi stays in /opt/intercom-button/hil-config.json on the runner (not a variable).
 name: HIL
 
 on:
@@ -30,6 +30,18 @@ on:
 
 env:
   HIL_ARTIFACT_DIR: /var/tmp/intercom-button-hil/${{ github.run_id }}
+  HIL_MAC: ${{ vars.HIL_MAC }}
+  HIL_SERVER: ${{ vars.HIL_SERVER }}
+  HIL_NAS_HOST: ${{ vars.HIL_NAS_HOST }}
+  HIL_NAS_USER: ${{ vars.HIL_NAS_USER }}
+  HIL_NAS_SSH_KEY: ${{ vars.HIL_NAS_SSH_KEY }}
+  HIL_NAS_DOCKER: ${{ vars.HIL_NAS_DOCKER }}
+  HIL_NAS_CONTAINER: ${{ vars.HIL_NAS_CONTAINER }}
+  HIL_LAN_IMAGE: ${{ vars.HIL_LAN_IMAGE }}
+  HIL_CONFIG: ${{ vars.HIL_CONFIG }}
+  HIL_LOCK: ${{ vars.HIL_LOCK }}
+  HIL_USB_VERSION: ${{ vars.HIL_USB_VERSION }}
+  HIL_LITTLEFS_OFFSET: ${{ vars.HIL_LITTLEFS_OFFSET }}
 
 jobs:
   compile:

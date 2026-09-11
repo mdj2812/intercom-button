@@ -3,6 +3,11 @@
 # Phases: compile | flash | test | all (default).
 # USB-flashes a baseline image, runs confirm_test, then plants the branch
 # firmware on NAS home-intercom and waits for LAN OTA + hello confirm.
+#
+# Gitea Actions (`.gitea/workflows/hil.yml`) passes repo variables into these
+# HIL_* env vars. Change the reserved MAC / NAS host there, not in this file.
+# Defaults below are for a local `./scripts/hil_run.sh` on butler.
+# Wifi is never an env var — it stays in HIL_CONFIG (LittleFS json on the runner).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
